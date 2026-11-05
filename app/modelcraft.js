@@ -64,6 +64,7 @@ import { libMaterial, swatchPixels, imageTexture, imageMaterial as imgMaterial }
 import { mountTimeline } from './timeline.js';   // 0.6 LC.10: the animation timeline (render/anim.js)
 import { mountXrMc } from './xr-mc.js';   // 0.6 LC.19: review in a headset (xr/), the Issues list
 import { action3d, wheelFactor } from './input-mouse.js';
+import { markPen, unmarkPen, palmReject, pointerPos, onRelease } from './input-pointer.js';   // iPad: Pointer Events only; the Pencil is precise, a palm beside it is ignored
 import { mountMachineCard, benchParam, openBench } from './compute-mc.js';   // 0.7 CU.1: Settings › Rendering › Your machine; CU.8: ?bench=render
 import { GUIDE_STEPS, guideStep, guideFacts } from './firstmodel.js';   // 0.6 LC.21: the guided first model   // 0.5 IP.3: the menu style's buttons and wheel (input-modelcraft.js)
 import { getWorkspace, listWorkspaces, toolbarGroups, switcher as wsSwitcher, MODEL_GROUPS, workspaceOfCmd } from './workspaces.js';   // 0.7: Model · Mesh · …
@@ -737,7 +738,7 @@ function init(root) {
   ui.hint.querySelector('[data-hint-close]')?.addEventListener('click', () => { hideHint(); focusView?.(); });   // the start card's X, as CadCraft's
 
   // ---- pointer input ----
-  const pos = (e) => { const r = ui.over.getBoundingClientRect(); return e.pointerType === 'pen' ? { x: e.clientX - r.left, y: e.clientY - r.top, pen: true, pressure: e.pressure } : { x: e.clientX - r.left, y: e.clientY - r.top }; };   // a pen's pressure: MD.7 sculpting
+  const pos = (e) => pointerPos(ui.over, e);   // a pen adds pressure (MD.7 sculpting) and tilt; a mouse or finger has no pressure field
   const mods = (e) => ({ shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, button: e.button, time: e.timeStamp });
   let camDrag = null;
   let ctxPress = null;   // 0.7.1 MC-RIGHTCLICK-MENU: the menu button is down ({x, y, b}); released in place = the context menu
@@ -841,7 +842,9 @@ function init(root) {
     ui.over.focus({ preventScroll: true });
     closeMenus();
     const p = pos(e);
+    markPen(e);
     if (e.pointerType === 'touch') {
+      if (palmReject(e)) { touches.delete(e.pointerId); return; }   // a hand resting beside the Pencil
       markTouch();
       touches.set(e.pointerId, p);
       if (touches.size >= 2) {
@@ -901,6 +904,11 @@ function init(root) {
   });
   ui.over.addEventListener('pointermove', (e) => {
     const p = pos(e);
+    if (e.pointerType === 'touch' && palmReject(e)) {   // the Pencil came down while a finger rested: that finger is a palm now
+      touches.delete(e.pointerId);
+      if (tap && tap.id === e.pointerId) { clearTimeout(tap.timer); if (tap.started) tools.escape(); tap = null; loupe.hide(); }
+      return;
+    }
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
       touches.set(e.pointerId, p);
       if (pinch && touches.size >= 2) {
@@ -959,6 +967,7 @@ function init(root) {
   });
   const endPointer = (e) => {
     const p = pos(e);
+    unmarkPen(e);
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
       loupe.hide();
@@ -984,7 +993,25 @@ function init(root) {
     tools.up({ ...p, ...mods(e) });
   };
   ui.over.addEventListener('pointerup', endPointer);
-  ui.over.addEventListener('pointercancel', (e) => { touches.delete(e.pointerId); pinch = null; loupe.hide(); camDrag = null; ctxPress = null; if (tap && tap.id === e.pointerId) { clearTimeout(tap.timer); tap = null; } });
+  /**
+   * A pointer went away without a pointerup: pointercancel, a capture lost mid-press, the window losing focus (an app switch
+   * on the iPad). Nothing stays half-done: every finger, the pinch, the loupe, a camera drag, the held menu button and the
+   * tap are let go; a tool is cancelled only when a press–drag was in progress (the pointer moved since it went down and the
+   * tool is busy with it) — a modal tool waiting for its next click keeps what it has.
+   */
+  const releaseAll = () => {
+    touches.clear(); pinch = null; loupe.hide(); camDrag = null; ctxPress = null;
+    unmarkPen();
+    if (tap) { clearTimeout(tap.timer); const started = tap.started; tap = null; if (started && tools.tool.busy) tools.escape(); }
+    const d = tools.downAt;
+    if (d) {
+      tools.downAt = null;
+      const m = host.mouse;
+      if (m && Math.hypot(m.x - d.x, m.y - d.y) >= 6 && tools.tool.busy) tools.escape();
+    }
+    view.invalidate();
+  };
+  onRelease(ui.over, releaseAll);   // pointercancel, lostpointercapture, window blur
   // the touch bar (S.8): what the keyboard's Enter, Esc and Ctrl+Z do
   root.querySelector('[data-touchbar]')?.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-touch]');
