@@ -28,6 +28,7 @@ import { sunPosition } from './sun.js';
 import { dimLayout, dimTextBox, dimText, dimTextSize, sectionLayout } from './infer.js';
 import { formatLength } from './units.js';
 import { viewImage } from './viewimage.js';
+import { glOptions, pixelRatioCap, guardContext } from './gl-settings.js';
 
 const KIND_COLOR = {
   end: '--layer-green', mid: '--layer-cyan', center: '--layer-blue', edge: '--layer-red', face: '--layer-blue', guide: '--ink-2', guidept: '--ink-2',
@@ -40,10 +41,17 @@ export class View3D {
     this.gl = gl; this.over = over; this.model = model; this.cam = cam; this.ui = ui;
     this.style = { mode: 'shaded', edges: true, shadows: false, sun: { month: 6, day: 21, hour: 15, lat: 40, lon: -105, tz: -7 } };
     // stencil: filled section cuts (0.4 M7, BimCraft's method); clipping is per material, all sharing this.clip
-    this.renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: true, preserveDrawingBuffer: true, stencil: true });
+    // gl-settings.js: iPad Safari gets high-performance power and a dpr cap of 1.5 on big canvases; desktop is unchanged
+    this.renderer = new THREE.WebGLRenderer({ canvas: gl, ...glOptions(gl) });
     this.renderer.localClippingEnabled = true;
     this.clip = [];
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setPixelRatio(pixelRatioCap(gl.clientWidth, gl.clientHeight));
+    // a lost context (iPadOS reclaims GPU memory under pressure, a tab in the background): stop drawing, then rebuild on restore
+    this.contextLost = false;
+    this._unguard = guardContext(gl, {
+      onLost: () => { this.contextLost = true; if (this._raf) { cancelAnimationFrame(this._raf); this._raf = 0; } },
+      onRestored: () => { this.contextLost = false; this.dropCache(); this.builtFor = null; this.invalidate(); },
+    });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
@@ -94,7 +102,8 @@ export class View3D {
     const host = this.gl.parentElement;
     this.w = Math.max(1, this.gl.clientWidth || host.clientWidth); this.h = Math.max(1, this.gl.clientHeight || host.clientHeight);
     this.renderer.setSize(this.w, this.h, false);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = pixelRatioCap(this.w, this.h);
+    if (this.renderer.getPixelRatio() !== dpr) { this.renderer.setPixelRatio(dpr); this.renderer.setSize(this.w, this.h, false); }   // an iPad rotated: the cap can change with the size
     this.over.width = Math.round(this.w * dpr); this.over.height = Math.round(this.h * dpr);
     this.dpr = dpr;
     this.cam.setSize(this.w, this.h);
@@ -103,6 +112,14 @@ export class View3D {
   invalidate() {
     if (this._raf) return;
     this._raf = requestAnimationFrame(() => { this._raf = 0; this.draw(); });
+  }
+  /** Let the GPU go: stop observing, drop every cached geometry, dispose the renderer (safe to call twice). */
+  dispose() {
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = 0; }
+    this.ro?.disconnect();
+    this._unguard?.(); this._unguard = null;
+    this.dropCache();
+    this.renderer?.dispose?.();
   }
 
   // ---- building the three.js scene from the model ----
@@ -761,6 +778,7 @@ export class View3D {
   }
 
   draw() {
+    if (this.contextLost) return;   // nothing to draw into until webglcontextrestored
     const u = this.ui();
     const key = this.model.version + '|' + u.path.join('/') + '|' + JSON.stringify(this.style) + '|' + u.sel.map((s) => s.t + s.id).join(',') + '|' + this.c.bg + '|' + !!u.present + '|' + !!u.hideRest + '|' + !!u.showHidden;
     if (key !== this.builtFor) { this.build(); this.builtFor = key; }

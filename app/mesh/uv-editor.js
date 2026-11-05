@@ -28,6 +28,8 @@ export class UVEditor {
     on('pointerdown', (e) => this.down(e));
     on('pointermove', (e) => this.move(e));
     on('pointerup', (e) => this.up(e));
+    on('pointercancel', (e) => this.up(e));   // a lost pointer (pointercancel, a capture taken away, an app switch) ends the drag
+    this.cv.style.touchAction = 'none';
     on('pointerenter', () => { this.hover = true; });
     on('pointerleave', () => { this.hover = false; });
     on('dblclick', (e) => { const f = this.faceAt(this.local(e)); if (f >= 0) this.selectIsland(f, e.shiftKey); });

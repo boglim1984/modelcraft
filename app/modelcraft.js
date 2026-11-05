@@ -50,6 +50,7 @@ import { dynamicSummary } from './dwg-dynamic.js';   // 0.5 DB.11 (a byte-identi
 import { sunPosition } from './sun.js';
 import { ident, dist, add, sub, mul, dot, cross, norm } from './vec.js';
 import { el } from './ui-util.js';
+import { mountTouchUi, setLastPointerType, hitScale } from './touch-ui.js';   // iPad: folding panels, long-press titles, pick reach per pointer
 import { mountViewCube, mountAxisIcon } from './viewcube.js';
 import * as i18n from "./i18n.js";
 import { cameraCubeOptions } from './viewcube-camera.js';
@@ -64,6 +65,8 @@ import { libMaterial, swatchPixels, imageTexture, imageMaterial as imgMaterial }
 import { mountTimeline } from './timeline.js';   // 0.6 LC.10: the animation timeline (render/anim.js)
 import { mountXrMc } from './xr-mc.js';   // 0.6 LC.19: review in a headset (xr/), the Issues list
 import { action3d, wheelFactor } from './input-mouse.js';
+import { markPen, unmarkPen, palmReject, pointerPos, onRelease } from './input-pointer.js';   // iPad: Pointer Events only; the Pencil is precise, a palm beside it is ignored
+import { createModBar } from './modbar.js';   // iPad: sticky Shift / Ctrl / Alt, Snap and Ortho without a keyboard
 import { mountMachineCard, benchParam, openBench } from './compute-mc.js';   // 0.7 CU.1: Settings › Rendering › Your machine; CU.8: ?bench=render
 import { GUIDE_STEPS, guideStep, guideFacts } from './firstmodel.js';   // 0.6 LC.21: the guided first model   // 0.5 IP.3: the menu style's buttons and wheel (input-modelcraft.js)
 import { getWorkspace, listWorkspaces, toolbarGroups, switcher as wsSwitcher, MODEL_GROUPS, workspaceOfCmd } from './workspaces.js';   // 0.7: Model · Mesh · …
@@ -87,6 +90,7 @@ import { modPanel } from './mesh/mod-panel.js';
 import { cleanGroup, canModify, modifierDef, setModifiers, GROUP_TYPES, newMod } from './group-mods.js';   // 0.8 GH.2: the stack on a group or component
 import { setMeshHooks, meshDef } from './model.js';
 import { Mesh } from './mesh.js';
+import { blockPageZoom } from './touch-gestures.js';   // iPad: the page never zooms under the fingers
 const { t } = i18n;
 /** The display unit in words, lower case ("feet and inches", "millimeters"). */
 const unitWords = (u) => t('app.unit.' + String(u).replace('-', '_'));
@@ -271,7 +275,7 @@ function init(root) {
     render: async () => { const { mcScene } = await import('./render-mc.js'); return { scene: (s) => mcScene(model, cam, view.style, s), viewSize: () => ({ w: ui.gl.clientWidth, h: ui.gl.clientHeight }), settings: () => renderSettings, fileBase: base, download: (blob, name) => download(blob, name, blob.type || 'application/octet-stream'), appName: 'ModelCraft' }; } });
 
   // ---- settings (Settings › ModelCraft; per viewer conveniences only) ----
-  const SET_DEFAULTS = { keys: 'sketchup', scroll: 'auto', touch2: 'pan', snap: true, collide: true, corner: 'cube', bed: '', orbitAt: 'cursor', orbitSpeed: 1, panSpeed: 1 };
+  const SET_DEFAULTS = { keys: 'sketchup', scroll: 'auto', touch1: 'orbit', touch2: 'pan', snap: true, collide: true, corner: 'cube', bed: '', orbitAt: 'cursor', orbitSpeed: 1, panSpeed: 1 };
   const SPEED = (x) => Number.isFinite(x) && x >= 0.25 && x <= 3;   // 0.7.1 MC-ORBIT-CURSOR: the speed sliders' range
   const settings = (() => {
     const out = { ...SET_DEFAULTS };
@@ -280,6 +284,7 @@ function init(root) {
       if (v.keys === 'blender' || v.keys === 'sketchup') out.keys = v.keys;
       if (['auto', 'mouse', 'trackpad'].includes(v.scroll)) out.scroll = v.scroll;
       if (['pan', 'orbit'].includes(v.touch2)) out.touch2 = v.touch2;
+      if (['orbit', 'draw'].includes(v.touch1)) out.touch1 = v.touch1;   // iPad: one finger orbits (default) | draws (the tool)
       if (typeof v.snap === 'boolean') out.snap = v.snap;
       if (typeof v.collide === 'boolean') out.collide = v.collide;
       if (['cube', 'axes', 'none'].includes(v.corner)) out.corner = v.corner;
@@ -310,6 +315,7 @@ function init(root) {
     if (settingsDlg) {
       settingsDlg.querySelectorAll('input[name="mcKeys"]').forEach((r) => { r.checked = r.value === settings.keys; });
       settingsDlg.querySelectorAll('input[name="mcScroll"]').forEach((r) => { r.checked = r.value === settings.scroll; });
+      settingsDlg.querySelectorAll('input[name="mcTouch1"]').forEach((r) => { r.checked = r.value === settings.touch1; });
       settingsDlg.querySelectorAll('input[name="mcTouch2"]').forEach((r) => { r.checked = r.value === settings.touch2; });
       const sn = settingsDlg.querySelector('input[name="mcSnap"]'), co = settingsDlg.querySelector('input[name="mcCollide"]');
       if (sn) sn.checked = settings.snap;
@@ -341,6 +347,7 @@ function init(root) {
       const t = e.target;
       if (t.name === 'mcKeys') setKeys(t.value);
       else if (t.name === 'mcScroll') setSetting('scroll', t.value);
+      else if (t.name === 'mcTouch1') setSetting('touch1', t.value);
       else if (t.name === 'mcTouch2') setSetting('touch2', t.value);
       else if (t.name === 'mcSnap') setSetting('snap', t.checked);
       else if (t.name === 'mcCollide') setSetting('collide', t.checked);
@@ -724,7 +731,7 @@ function init(root) {
   ui.over.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || tools.name !== 'select' || !model.lights.size) return;
     const r = ui.over.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, vp = cam.viewProj();
-    let best = null, bd = 11;
+    let best = null, bd = 11 * hitScale();   // touch-ui.js: a finger reaches further than a mouse
     for (const [id, L] of model.lights) { const s2 = cam.project(L.p, vp); if (s2) { const d = Math.hypot(s2[0] - x, s2[1] - y); if (d < bd) { bd = d; best = id; } } }
     if (best === null) return;
     e.stopImmediatePropagation(); e.preventDefault();
@@ -737,8 +744,19 @@ function init(root) {
   ui.hint.querySelector('[data-hint-close]')?.addEventListener('click', () => { hideHint(); focusView?.(); });   // the start card's X, as CadCraft's
 
   // ---- pointer input ----
-  const pos = (e) => { const r = ui.over.getBoundingClientRect(); return e.pointerType === 'pen' ? { x: e.clientX - r.left, y: e.clientY - r.top, pen: true, pressure: e.pressure } : { x: e.clientX - r.left, y: e.clientY - r.top }; };   // a pen's pressure: MD.7 sculpting
-  const mods = (e) => ({ shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, button: e.button, time: e.timeStamp });
+  const pos = (e) => pointerPos(ui.over, e);   // a pen adds pressure (MD.7 sculpting) and tilt; a mouse or finger has no pressure field
+  // the modifier bar (modbar.js; iPad without a keyboard): its held keys reach the tools as the keyboard's would — Shift mid-gesture
+  // locks the inference as the document keydown does (tools.key), letting go as its keyup (tools.keyUp)
+  const modBar = createModBar(root, {
+    onKey: (name, down) => {
+      if (down) tools.key(name, { ...cursorEv(), shift: name === 'Shift', ctrl: name === 'Control', alt: name === 'Alt' });
+      else tools.keyUp(name);
+      if (tools.tool.lastEv) tools.tool.hover?.(modBar.with(tools.tool.lastEv));
+      view.invalidate();
+    },
+    onToggle: (id) => { if (id === 'snap') toggle('snap'); else if (id === 'ortho') perspBtn.click(); },
+  });
+  const mods = (e) => { const m = modBar.state(); return { shift: e.shiftKey || m.shift, ctrl: e.ctrlKey || e.metaKey || m.ctrl, alt: e.altKey || m.alt, button: e.button, time: e.timeStamp }; };
   let camDrag = null;
   let ctxPress = null;   // 0.7.1 MC-RIGHTCLICK-MENU: the menu button is down ({x, y, b}); released in place = the context menu
   /**
@@ -758,7 +776,8 @@ function init(root) {
   // S.8 touch: one finger is the tool — a quick tap is a click, a drag is a press–drag; holding still for half a second
   // finishes what the tool is doing (as Enter), or, with nothing going on, turns that finger into orbit until it lifts.
   // Two fingers pan and pinch-zoom, three orbit (Settings › ModelCraft › Two fingers swaps them: settings.touch2).
-  // While a drawing finger is down, a loupe above it shows what is under it (the snaps a finger hides).
+  // While a drawing finger is down, a loupe above it shows what is under it (the snaps a finger hides). A pencil gets one too
+  // (precision-input, iPad): up-left of the tip, out from under the hand, while a sketch tool is busy or hovers a snap.
   let tap = null;            // the first finger, held back until it moves, lifts or is held
   const LONG_MS = 500, MOVE_PX = 8;
   const loupe = (() => {
@@ -767,18 +786,29 @@ function init(root) {
     c.hidden = true;
     c.setAttribute('aria-hidden', 'true');
     ui.stage.append(c);
-    const R = 64, ZOOM = 2;   // screen px: the loupe's size is set here, its place follows the finger
+    const R = 64, ZOOM_FINGER = 2, ZOOM_PEN = 2.5, PEN_OFF = 90;   // screen px: the loupe's size is set here, its place follows the pointer
     c.style.width = c.style.height = R * 2 + 'px';
-    let at = null, raf = 0;
+    let at = null, raf = 0, pen = false;
+    // the tools that draw: a pencil over a snap of theirs wants to see it (the others: select, orbit, pan, move… no loupe)
+    const SKETCH = new Set(['line', 'rect', 'circle', 'polygon', 'arc', 'arcc', 'curve', 'follow', 'offset', 'push', 'tape', 'protractor', 'dim', 'divide', 'axes', 'section']);
     const paint = () => {
       raf = 0;
       if (!at) return;
       const dpr = window.devicePixelRatio || 1, W = Math.round(R * 2 * dpr);
       if (c.width !== W) { c.width = W; c.height = W; }
-      // above the finger, or below it near the top edge
-      const top = at.y - R * 2 - 36 >= 0 ? at.y - R * 2 - 36 : at.y + 36;
-      c.style.left = Math.max(0, Math.min(ui.stage.clientWidth - R * 2, at.x - R)) + 'px';
-      c.style.top = top + 'px';
+      const ZOOM = pen ? ZOOM_PEN : ZOOM_FINGER;
+      let left, top;
+      if (pen) {
+        // up-left of the pencil's tip (a right hand covers what is down-right of it); mirrored at the stage's edges
+        left = at.x - PEN_OFF - R; if (left < 0) left = at.x + PEN_OFF - R;
+        top = at.y - PEN_OFF - R; if (top < 0) top = at.y + PEN_OFF - R;
+      } else {
+        // above the finger, or below it near the top edge
+        left = at.x - R;
+        top = at.y - R * 2 - 36 >= 0 ? at.y - R * 2 - 36 : at.y + 36;
+      }
+      c.style.left = Math.max(0, Math.min(ui.stage.clientWidth - R * 2, left)) + 'px';
+      c.style.top = Math.max(0, Math.min(ui.stage.clientHeight - R * 2, top)) + 'px';
       const g = c.getContext('2d');
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, W, W);
@@ -792,14 +822,28 @@ function init(root) {
       g.strokeStyle = getComputedStyle(root).getPropertyValue('--action') || '#06c';
       g.lineWidth = dpr;
       g.beginPath(); g.moveTo(W / 2 - 8 * dpr, W / 2); g.lineTo(W / 2 + 8 * dpr, W / 2); g.moveTo(W / 2, W / 2 - 8 * dpr); g.lineTo(W / 2, W / 2 + 8 * dpr); g.stroke();
+      // a ring in the current inference's colour (the overlay's marker: end, mid, center, edge, face, axes…)
+      const kind = host.overlayState?.marker?.kind;
+      if (kind) { g.strokeStyle = view.color(kind); g.lineWidth = 3 * dpr; g.beginPath(); g.arc(W / 2, W / 2, W / 2 - 2 * dpr, 0, Math.PI * 2); g.stroke(); }
       g.restore();
       c.hidden = false;
     };
-    return {
+    const L = {
       // after the view's own frame (tools.move asked for it first), so the loupe copies what was just drawn
-      show(p) { if (tools.name === 'select' || tools.name === 'orbit' || tools.name === 'pan') { this.hide(); return; } at = p; if (!raf) raf = requestAnimationFrame(() => requestAnimationFrame(paint)); },
+      show(p, isPen = false) { if (tools.name === 'select' || tools.name === 'orbit' || tools.name === 'pan') { this.hide(); return; } at = p; pen = isPen; if (!raf) raf = requestAnimationFrame(() => requestAnimationFrame(paint)); },
       hide() { at = null; c.hidden = true; },
     };
+    // the pencil: its own listeners (the main handlers below stay the fingers' and the mouse's); shown while a sketch tool is busy
+    // or the overlay marks a snap under the hovering tip; gone when the tip lifts, leaves or is cancelled
+    const penMove = (e) => {
+      if (e.pointerType !== 'pen') return;
+      if (!SKETCH.has(tools.name) || (!tools.tool.busy && !host.overlayState?.marker) || (e.buttons & ~1) !== 0) { if (pen) L.hide(); return; }
+      L.show(pos(e), true);
+    };
+    const penEnd = (e) => { if (e.pointerType === 'pen' && pen) L.hide(); };
+    ui.over.addEventListener('pointermove', penMove);
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) ui.over.addEventListener(ev, penEnd);
+    return L;
   })();
   const markTouch = () => {
     if (tools.touch) return;
@@ -823,6 +867,8 @@ function init(root) {
         if (document.activeElement === ui.vcb) { ui.vcb.blur(); ui.vcb.focus(); }   // the keyboard changes on the next focus
       });
     }
+    // precision-input (iPad): the "123" affordance, the floating "Enter a length" button and the unit chips (dim-field.js)
+    import('./dim-field.js').then((m) => m.createDimField(ui, { tools, focusView, root, t, el })).catch((err) => console.warn('dim-field', err));
   };
   if (matchMedia?.('(pointer: coarse)').matches) markTouch();   // i18n-ignore: a media query
   const longPress = () => {
@@ -832,16 +878,25 @@ function init(root) {
     loupe.hide();
     navigator.vibrate?.(15);
     if (tools.tool.busy) { if (!tools.tool.finish?.()) tools.escape(); print(t('app.touch.done')); view.invalidate(); }
+    else if (settings.touch1 !== 'draw') openCtxMenu({ x: tap.x, y: tap.y }, true);   // one finger already orbits: a hold is the menu
     else { tap.orbit = { x: tap.x, y: tap.y }; print(t('app.touch.orbit')); }
   };
   ui.over.addEventListener('contextmenu', (e) => e.preventDefault());
+  blockPageZoom(document, ui.stage);   // iPad: a pinch or a two-finger drag never zooms the page
   let penBack = null;   // the tool to go back to when the pen's tip comes down after its eraser end
+  let penHold = null, penHoldFired = null;   // a pen tip held still ({id, x, y, timer}) → the context menu; the pointer whose lift is spent
+  const PEN_HOLD_MS = 600, PEN_HOLD_PX = 6;
+  const penHoldCancel = () => { if (penHold) { clearTimeout(penHold.timer); penHold = null; } };
+  ui.over.addEventListener('pointercancel', (e) => { if (penHold && e.pointerId === penHold.id) penHoldCancel(); });   // the pen left or the browser took the gesture: no hold
   const penEraser = (e) => e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) !== 0);
   ui.over.addEventListener('pointerdown', (e) => {
     ui.over.focus({ preventScroll: true });
     closeMenus();
     const p = pos(e);
+    markPen(e);
+    setLastPointerType(e.pointerType);   // touch-ui.js: how far picks reach for this pointer
     if (e.pointerType === 'touch') {
+      if (palmReject(e)) { touches.delete(e.pointerId); return; }   // a hand resting beside the Pencil
       markTouch();
       touches.set(e.pointerId, p);
       if (touches.size >= 2) {
@@ -851,13 +906,17 @@ function init(root) {
         const pts = [...touches.values()];
         const c = { x: pts.reduce((a, q) => a + q.x, 0) / pts.length, y: pts.reduce((a, q) => a + q.y, 0) / pts.length };
         if (pinch?.raf) cancelAnimationFrame(pinch.raf);
-        pinch = { n: pts.length, c, d: pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0, raf: 0, pivot: camPivot(c.x, c.y) };
+        const was = pinch;
+        pinch = { n: pts.length, c, d: pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0, raf: 0, pivot: camPivot(c.x, c.y),
+          // an n-finger tap (two = undo, three = redo): every finger down and up within 250 ms, none moving 10 px — the camera waits that long
+          t0: was?.t0 ?? e.timeStamp, start: new Map([...(was?.start || []), [e.pointerId, p]]), maxN: Math.max(was?.maxN || 0, pts.length), moved: was?.moved || false, armed: was?.armed || false };
+        if (!was) for (const [id, q] of touches) pinch.start.set(id, q);
         return;
       }
       ui.over.setPointerCapture(e.pointerId);
       host.mouse = p;
       tools.move({ ...p });
-      tap = { id: e.pointerId, x: p.x, y: p.y, started: false, done: false, orbit: null, timer: setTimeout(longPress, LONG_MS) };
+      tap = { id: e.pointerId, x: p.x, y: p.y, started: false, done: false, orbit: null, pivot: null, timer: setTimeout(longPress, LONG_MS) };
       loupe.show(p);
       return;
     }
@@ -873,6 +932,20 @@ function init(root) {
         return;
       }
       if (penBack && e.button === 0) { const back = penBack; penBack = null; if (tools.name === 'erase') setTool(back); }
+      // a Pencil has no right button: its tip held still for 600 ms opens the context menu (a press that began a tool
+      // action lets go of it first; the lift that follows does nothing)
+      if (e.button === 0 && !tools.tool.busy) {
+        penHoldCancel();
+        penHold = { id: e.pointerId, x: p.x, y: p.y, timer: setTimeout(() => {
+          const h = penHold; penHold = null;
+          if (!h || !ui.over.hasPointerCapture?.(h.id)) return;   // the pen left (pointercancel)
+          if (tools.tool.busy) tools.escape();
+          penHoldFired = h.id;
+          openCtxMenu({ x: h.x, y: h.y }, true);
+          navigator.vibrate?.(15);
+          view.invalidate();
+        }, PEN_HOLD_MS) };
+      }
     }
     // Blender style: right-click cancels what a tool is doing; Alt + left-drag orbits (Alt+Shift pans) for
     // trackpads and mice without a middle button; Ctrl + middle-drag zooms
@@ -901,6 +974,11 @@ function init(root) {
   });
   ui.over.addEventListener('pointermove', (e) => {
     const p = pos(e);
+    if (e.pointerType === 'touch' && palmReject(e)) {   // the Pencil came down while a finger rested: that finger is a palm now
+      touches.delete(e.pointerId);
+      if (tap && tap.id === e.pointerId) { clearTimeout(tap.timer); if (tap.started) tools.escape(); tap = null; loupe.hide(); }
+      return;
+    }
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
       touches.set(e.pointerId, p);
       if (pinch && touches.size >= 2) {
@@ -913,6 +991,13 @@ function init(root) {
           const c = { x: pts.reduce((a, q) => a + q.x, 0) / pts.length, y: pts.reduce((a, q) => a + q.y, 0) / pts.length };
           const d = pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
           if (pts.length !== pinch.n) { pinch.n = pts.length; pinch.c = c; pinch.d = d; return; }
+          if (!pinch.armed) {
+            const far = [...touches].some(([id, q]) => { const s0 = pinch.start.get(id); return !s0 || Math.hypot(q.x - s0.x, q.y - s0.y) >= 10; });
+            if (far) pinch.moved = true;
+            if (far || e.timeStamp - pinch.t0 > 250) pinch.armed = true;
+            pinch.c = c; pinch.d = d;   // the drag starts from here (a tap in the making holds the camera)
+            return;
+          }
           // two fingers pan (or orbit, settings.touch2) and pinch; three do the other
           const move = (pts.length >= 3) === (settings.touch2 === 'orbit') ? 'pan' : 'orbit';
           if (c.x !== pinch.c.x || c.y !== pinch.c.y) cam[move](c.x - pinch.c.x, c.y - pinch.c.y, pinch.pivot);
@@ -925,7 +1010,7 @@ function init(root) {
       if (pinch) return;
       if (tap && e.pointerId === tap.id && tap.orbit) {
         // held still on nothing, then moved: one-finger orbit
-        cam.orbit(p.x - tap.orbit.x, p.y - tap.orbit.y);
+        cam.orbit(p.x - tap.orbit.x, p.y - tap.orbit.y, tap.pivot);
         tap.orbit = { x: p.x, y: p.y };
         view.invalidate();
         return;
@@ -934,6 +1019,11 @@ function init(root) {
         host.mouse = p;
         if (!tap.started) {
           if (Math.hypot(p.x - tap.x, p.y - tap.y) < MOVE_PX) { tools.move({ ...p }); loupe.show(p); return; }
+          if (settings.touch1 !== 'draw') {   // iPad: one finger orbits (a tap is still a click, a hold the menu)
+            clearTimeout(tap.timer); tap.done = true; loupe.hide(); hideHint();
+            tap.orbit = { x: p.x, y: p.y }; tap.pivot = camPivot(tap.x, tap.y);
+            return;
+          }
           // it moves: a press–drag from where the finger went down
           clearTimeout(tap.timer); tap.started = true;
           hideHint();
@@ -946,6 +1036,7 @@ function init(root) {
       if (tap?.done) return;
     }
     host.mouse = p;
+    if (penHold && e.pointerId === penHold.id && Math.hypot(p.x - penHold.x, p.y - penHold.y) > PEN_HOLD_PX) penHoldCancel();   // the pen moved: a drag, not a hold
     if (ctxPress) return;   // 0.7.1: a right button held for the context menu
     if (camDrag) {
       const dx = p.x - camDrag.x, dy = p.y - camDrag.y;
@@ -959,10 +1050,21 @@ function init(root) {
   });
   const endPointer = (e) => {
     const p = pos(e);
+    unmarkPen(e);
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
       loupe.hide();
-      if (pinch) { if (!touches.size) pinch = null; return; }
+      if (pinch) {
+        const s0 = pinch.start.get(e.pointerId);
+        if (!s0 || Math.hypot(p.x - s0.x, p.y - s0.y) >= 10) pinch.moved = true;
+        if (!touches.size) {
+          const pz = pinch; pinch = null;
+          if (!pz.armed && !pz.moved && e.timeStamp - pz.t0 <= 250 && e.type === 'pointerup' && (pz.maxN === 2 || pz.maxN === 3)) {
+            act(pz.maxN === 2 ? 'undo' : 'redo'); print(t(pz.maxN === 2 ? 'app.touch.undo' : 'app.touch.redo')); navigator.vibrate?.(10); view.invalidate();
+          }
+        }
+        return;
+      }
       if (tap && e.pointerId === tap.id) {
         const t = tap;
         clearTimeout(t.timer); tap = null;
@@ -973,6 +1075,8 @@ function init(root) {
       }
       return;
     }
+    if (penHold && e.pointerId === penHold.id) penHoldCancel();
+    if (penHoldFired === e.pointerId) { penHoldFired = null; return; }   // the lift after a pen hold opened the context menu
     if (ctxPress && e.button === ctxPress.b) {   // 0.7.1: a click (no drag) of the menu button opens the context menu
       const c = ctxPress;
       ctxPress = null;
@@ -984,7 +1088,25 @@ function init(root) {
     tools.up({ ...p, ...mods(e) });
   };
   ui.over.addEventListener('pointerup', endPointer);
-  ui.over.addEventListener('pointercancel', (e) => { touches.delete(e.pointerId); pinch = null; loupe.hide(); camDrag = null; ctxPress = null; if (tap && tap.id === e.pointerId) { clearTimeout(tap.timer); tap = null; } });
+  /**
+   * A pointer went away without a pointerup: pointercancel, a capture lost mid-press, the window losing focus (an app switch
+   * on the iPad). Nothing stays half-done: every finger, the pinch, the loupe, a camera drag, the held menu button and the
+   * tap are let go; a tool is cancelled only when a press–drag was in progress (the pointer moved since it went down and the
+   * tool is busy with it) — a modal tool waiting for its next click keeps what it has.
+   */
+  const releaseAll = () => {
+    touches.clear(); pinch = null; loupe.hide(); camDrag = null; ctxPress = null;
+    unmarkPen();
+    if (tap) { clearTimeout(tap.timer); const started = tap.started; tap = null; if (started && tools.tool.busy) tools.escape(); }
+    const d = tools.downAt;
+    if (d) {
+      tools.downAt = null;
+      const m = host.mouse;
+      if (m && Math.hypot(m.x - d.x, m.y - d.y) >= 6 && tools.tool.busy) tools.escape();
+    }
+    view.invalidate();
+  };
+  onRelease(ui.over, releaseAll);   // pointercancel, lostpointercapture, window blur
   // the touch bar (S.8): what the keyboard's Enter, Esc and Ctrl+Z do
   root.querySelector('[data-touchbar]')?.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-touch]');
@@ -1810,6 +1932,22 @@ function init(root) {
     print(cam.persp ? t('app.persp.on') : t('app.persp.off'));
     view.invalidate();
   });
+  // the modifier bar's Snap and Ortho show the state of the buttons they click (the status bar's Snap, Views › Perspective),
+  // however it changes; its held keys reach every tool event (the finger paths pass no keyboard state), letting go after up
+  {
+    const snapBtn = root.querySelector('[data-mc-toggle="snap"]');
+    const syncModBar = () => {
+      modBar.set('snap', snapBtn ? snapBtn.getAttribute('aria-pressed') === 'true' : !!settings.snap);
+      modBar.set('ortho', perspBtn.getAttribute('aria-checked') === 'false');
+    };
+    syncModBar();
+    if (typeof MutationObserver === 'function') {
+      const mo = new MutationObserver(syncModBar);
+      if (snapBtn) mo.observe(snapBtn, { attributes: true, attributeFilter: ['aria-pressed'] });
+      mo.observe(perspBtn, { attributes: true, attributeFilter: ['aria-checked'] });
+    }
+    modBar.wrap(tools);
+  }
   const presentBtn = $('[data-present]');
   function setPresentation(on) {
     presentation = !!on;
@@ -3939,6 +4077,7 @@ function init(root) {
     const goStatus = () => { window.ccAccess.follow(ui.msg, { max: 240 }); window.ccAccess.follow(ui.tip, { max: 160 }); };
     for (const f of [goAccess, goStatus]) { if (window.ccAccess) f(); else document.addEventListener('cc-access-ready', f, { once: true }); }
   }
+  mountTouchUi(root, { print });   // iPad (touch-ui.js): folding panel sections, a long press says a button's title
   window.modelcraft.shell = shell;
 }
 

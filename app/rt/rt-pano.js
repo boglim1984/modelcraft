@@ -134,6 +134,7 @@ let drag = null;
 cv.addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', (e) => { if (!drag) return; const s = fov / cv.clientHeight * Math.PI / 180; yaw -= (e.clientX - drag[0]) * s; pitch = Math.max(-1.5, Math.min(1.5, pitch + (e.clientY - drag[1]) * s)); drag = [e.clientX, e.clientY]; draw(); });
 cv.addEventListener('pointerup', () => { drag = null; });
+for (const n of ['pointercancel', 'lostpointercapture']) cv.addEventListener(n, () => { drag = null; });   // a lost pointer (pointercancel, a capture taken away, an app switch) ends the drag
 cv.addEventListener('wheel', (e) => { e.preventDefault(); fov = Math.max(30, Math.min(110, fov * Math.exp(e.deltaY * 0.001))); draw(); }, { passive: false });
 addEventListener('resize', draw);
 go(0);

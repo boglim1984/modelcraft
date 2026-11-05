@@ -220,7 +220,7 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
   </div>
 
   <aside class="mc-panel mc-left" aria-label="<?= Lang::e('ui.left.aria') ?>">
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="outliner" data-sec-open>
       <div class="mc-sec-head" data-tree-top title="<?= Lang::e('ui.outliner.top_title') ?>">
         <h2 class="mc-h"><?= Lang::e('ui.outliner') ?></h2>
         <button type="button" class="mc-linkbtn" data-close-ctx hidden><?= Lang::e('ui.outliner.close') ?></button>
@@ -230,7 +230,7 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
       <ul class="mc-tree" data-tree></ul>
       <p class="mc-note" data-tree-empty data-keys-note="tree"><?= $__lx('ui.outliner.empty', ['comp' => '<kbd>G</kbd>', 'group' => '<kbd>Shift</kbd>+<kbd>G</kbd>']) ?></p>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="comps">
       <div class="mc-sec-head">
         <h2 class="mc-h"><?= Lang::e('ui.comps') ?></h2>
         <button type="button" class="mc-linkbtn" data-starter><i class="bi bi-grid" aria-hidden="true"></i> <?= Lang::e('ui.comps.starter') ?></button>
@@ -268,6 +268,15 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
       <button type="button" class="mc-tool" data-touch="cancel"><i class="bi bi-x-lg" aria-hidden="true"></i><span><?= Lang::e('ui.touch.cancel') ?></span></button>
       <button type="button" class="mc-tool" data-touch="undo"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span><?= Lang::e('ui.touch.undo') ?></span></button>
     </div>
+    <?php /* The modifier bar (modbar.js): sticky Shift / Ctrl / Alt, Snap and Ortho for an iPad without a keyboard; shown on .is-touch */ ?>
+    <div class="mc-modbar" data-modbar role="toolbar" aria-label="<?= Lang::e('ui.mod.aria') ?>">
+      <button type="button" class="mc-tool" data-mod="shift" aria-pressed="false" title="<?= Lang::e('ui.mod.shift.title') ?>"><i class="bi bi-shift" aria-hidden="true"></i><span><?= Lang::e('ui.mod.shift') ?></span></button>
+      <button type="button" class="mc-tool" data-mod="ctrl" aria-pressed="false" title="<?= Lang::e('ui.mod.ctrl.title') ?>"><i class="bi bi-command" aria-hidden="true"></i><span><?= Lang::e('ui.mod.ctrl') ?></span></button>
+      <button type="button" class="mc-tool" data-mod="alt" aria-pressed="false" title="<?= Lang::e('ui.mod.alt.title') ?>"><i class="bi bi-option" aria-hidden="true"></i><span><?= Lang::e('ui.mod.alt') ?></span></button>
+      <span class="mc-modbar-sep" aria-hidden="true"></span>
+      <button type="button" class="mc-tool" data-mod="snap" aria-pressed="true" title="<?= Lang::e('ui.snap.title') ?>"><i class="bi bi-magnet" aria-hidden="true"></i><span><?= Lang::e('ui.mod.snap') ?></span></button>
+      <button type="button" class="mc-tool" data-mod="ortho" aria-pressed="false" title="<?= Lang::e('ui.mod.ortho.title') ?>"><i class="bi bi-grid-3x3" aria-hidden="true"></i><span><?= Lang::e('ui.mod.ortho') ?></span></button>
+    </div>
   </section>
 
   <?php /* Animation (0.6 LC.10, session lc-model): the timeline under the view, built by timeline.js; hidden until Views › Timeline.
@@ -276,23 +285,23 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
   <section class="mc-timeline" data-timeline data-phone="keep" aria-label="<?= Lang::e('ui.timeline.aria') ?>" hidden></section>
 
   <aside class="mc-panel mc-right" aria-label="<?= Lang::e('ui.right.aria') ?>">
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="info" data-sec-open>
       <h2 class="mc-h" data-info-h><?= Lang::e('ui.info') ?></h2>
       <div data-info></div>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="colors">
       <h2 class="mc-h" id="mc-colors-h"><?= Lang::e('ui.colors') ?></h2>
       <div class="mc-palette" data-palette role="radiogroup" aria-labelledby="mc-colors-h"></div>
       <p class="mc-note" data-palette-note><?= Lang::e('ui.colors.note') ?></p>
     </section>
     <?php /* Materials (0.5 RC.7, session render): the library in render/materials.js, built by modelcraft.js "Materials". */ ?>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="materials">
       <h2 class="mc-h" id="mc-mats-h"><?= Lang::e('ui.materials') ?></h2>
       <div class="mc-matlib" data-matlib role="radiogroup" aria-labelledby="mc-mats-h"></div>
       <p class="mc-note"><?= Lang::e('ui.materials.note') ?></p>
     </section>
     <?php /* Lights (0.5 RC.11 (d), session render): lamps for rendered pictures; modelcraft.js "Lights". */ ?>
-    <section class="mc-sec" data-lights-sec>
+    <section class="mc-sec" data-lights-sec data-sec="lights">
       <h2 class="mc-h" id="mc-lights-h"><?= Lang::e('ui.lights') ?></h2>
       <div class="mc-lights-add" role="group" aria-labelledby="mc-lights-h">
         <button type="button" class="btn-line btn-sm-cc" data-light-add="point"><i class="bi bi-lightbulb" aria-hidden="true"></i> <?= Lang::e('ui.lights.point') ?></button>
@@ -303,13 +312,13 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
       <div class="mc-props" data-light-edit hidden></div>
       <p class="mc-note"><?= Lang::e('ui.lights.note') ?></p>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="tags">
       <h2 class="mc-h" id="mc-tags-h"><?= Lang::e('ui.tags') ?></h2>
       <ul class="mc-list mc-tags" data-tags aria-labelledby="mc-tags-h"></ul>
       <button type="button" class="mc-linkbtn" data-tag-add><i class="bi bi-plus-lg" aria-hidden="true"></i> <?= Lang::e('ui.tags.add') ?></button>
       <p class="mc-note"><?= Lang::e('ui.tags.note') ?></p>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="style">
       <h2 class="mc-h"><?= Lang::e('ui.style') ?></h2>
       <div class="mc-props" data-style>
         <label for="mc-mode"><?= Lang::e('ui.style.faces') ?></label>
@@ -350,7 +359,7 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
       </fieldset>
     </section>
     <?php /* Surfaces (0.8 SU.747b, round 3 model_PART_3): NURBS curves and untrimmed surfaces — the shared panel (nurbs-ui/), loaded by surfaces-mc.js on first use. */ ?>
-    <section class="mc-sec" data-nurbs-sec>
+    <section class="mc-sec" data-nurbs-sec data-sec="nurbs">
       <h2 class="mc-h" id="mc-nurbs-h"><?= Lang::e('nurbs.ui.title') ?></h2>
       <div data-nurbs aria-labelledby="mc-nurbs-h">
         <p class="mc-note"><?= Lang::e('nurbs.ui.intro') ?></p>
@@ -358,7 +367,7 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
       </div>
     </section>
     <?php /* Nodes (0.8 DC.54, round 3 nodes_PART_3): the node editor — a window over the view, loaded by nodes-mc.js on first use. */ ?>
-    <section class="mc-sec" data-nodes-sec>
+    <section class="mc-sec" data-nodes-sec data-sec="nodes">
       <h2 class="mc-h" id="mc-nodes-h"><?= Lang::e('nodes.title') ?></h2>
       <div aria-labelledby="mc-nodes-h">
         <p class="mc-note"><?= Lang::e('nodes.intro') ?></p>
@@ -366,13 +375,13 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
       </div>
     </section>
     <?php /* Issues (0.6 LC.19, session lc-model): placed in VR (Views › Review in VR), saved as BCF; xr-mc.js builds the list. */ ?>
-    <section class="mc-sec" data-issues>
+    <section class="mc-sec" data-issues data-sec="issues">
       <h2 class="mc-h" id="mc-issues-h"><?= Lang::e('ui.issues') ?></h2>
       <ul class="mc-list mc-issues" data-issues-list aria-labelledby="mc-issues-h"></ul>
       <p class="mc-note" data-issues-empty><?= Lang::e('ui.issues.empty') ?></p>
       <button type="button" class="btn-line btn-sm-cc" data-issues-bcf disabled><?= Lang::e('ui.issues.bcf') ?></button>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="scenes">
       <div class="mc-sec-head">
         <h2 class="mc-h"><?= Lang::e('ui.scenes') ?></h2>
         <button type="button" class="mc-linkbtn" data-scene-add><i class="bi bi-plus-lg" aria-hidden="true"></i> <?= Lang::e('ui.scenes.add') ?></button>
