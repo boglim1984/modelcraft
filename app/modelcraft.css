@@ -292,6 +292,55 @@ body.app-shell .sp-tab { bottom: 3.25rem; }
 .mc-touchbar { position: absolute; left: 50%; bottom: .75rem; transform: translateX(-50%); display: flex; gap: .25rem; padding: .25rem; background: var(--sheet); border: var(--pen-1) solid var(--line); border-radius: var(--radius); z-index: 3; }
 .mc-touchbar[hidden] { display: none; }
 
+/* ---- iPad / fingers (touch-ui.js): folding panel sections; 44 px hit areas under a coarse pointer; safe areas ----
+   The desktop (a fine pointer) keeps its sizes: everything below is either a no-op there (env() = 0) or inside
+   `@media (pointer: coarse)`. Hit zones that would move the layout grow through a ::before box instead. */
+.mc-sec-toggle { display: flex; align-items: center; gap: .4rem; width: 100%; margin: 0; padding: 0; font: inherit; color: inherit; background: none; border: 0; text-align: left; cursor: pointer; }
+.mc-sec-toggle::before { content: ""; flex: 0 0 auto; width: .4rem; height: .4rem; border-right: var(--pen-2) solid var(--ink-2); border-bottom: var(--pen-2) solid var(--ink-2); transform: translateY(-.1rem) rotate(45deg); transition: transform .12s; }
+.mc-sec[data-collapse="closed"] .mc-sec-toggle::before { transform: translateX(-.1rem) rotate(-45deg); }
+.mc-sec-toggle:focus-visible { outline: var(--pen-2) solid var(--action); outline-offset: 2px; }
+.mc-sec[data-collapse="closed"] > :not(.mc-sec-head):not(.mc-h) { display: none; }
+.mc-sec[data-collapse="closed"] > .mc-sec-head { margin-bottom: 0; }
+.mc-sec[data-collapse="closed"] > .mc-sec-head > :not(.mc-h) { display: none; }
+.mc-sec[data-collapse="closed"] > .mc-h { margin-bottom: 0; }
+/* safe areas (viewport-fit=cover): the bars keep clear of the notch and the home indicator; 0 on a desktop */
+.mc-tools { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.mc-status { padding-left: calc(1rem + env(safe-area-inset-left, 0px)); padding-right: calc(1rem + env(safe-area-inset-right, 0px)); padding-bottom: calc(.3rem + env(safe-area-inset-bottom, 0px)); }
+.mc-touchbar { bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+@media (pointer: coarse) {
+  /* 44 × 44 px (2.75rem) for everything a finger taps */
+  .mc-tool, .mc-toggle, .mc-icon, .mc-hint-close, .mc-vcb-kbd, .mc-sec-toggle, .mc-mi-tab, .mc-scenebar button, .mc-menu-list button,
+  .mc-ctx [role="menuitem"], .mc-node, .mc-scene-go, .mc-check, .mc-tree .mc-eye, .mc-tags .mc-eye, .mc-tags .mc-del, .mc-swatch,
+  .mc-light-presets button, .mc-lights-add button, .mc-scene-nav .btn-sm-cc, .mc-mod-head .mc-linkbtn { min-height: 2.75rem; }
+  .mc-tool, .mc-icon, .mc-hint-close, .mc-tree .mc-eye, .mc-tags .mc-eye, .mc-tags .mc-del, .mc-swatch { min-width: 2.75rem; }
+  .mc-tool { justify-content: center; }
+  .mc-icon, .mc-tree .mc-eye, .mc-tags .mc-eye, .mc-tags .mc-del { display: inline-flex; align-items: center; justify-content: center; }
+  .mc-menu-list button, .mc-ctx [role="menuitem"] { padding-block: .6rem; }
+  .mc-mi-tab, .mc-scenebar button { display: inline-flex; align-items: center; }
+  .mc-input, .mc-select, .mc-vcb-input { min-height: 2.75rem; }
+  .mc-props input[type="range"], .mc-row input[type="range"], .mc-tl-scrub { min-height: 2.75rem; }
+  .mc-check input[type="checkbox"], .mc-check input[type="radio"] { width: 1.5rem; height: 1.5rem; }
+  /* a bigger hit zone without moving the layout: small text links, timeline keys, the scene tab bar's lock mark */
+  .mc-linkbtn, .mc-tl-key, .mc-scene-acts, .mc-crumbs button { position: relative; }
+  .mc-linkbtn::before, .mc-tl-key::before { content: ""; position: absolute; inset: -.6rem; }
+  .mc-tl-key::before { inset: -.8rem; }
+  .mc-tree .mc-eye { opacity: 1; }                                 /* hover-only reveal → always there */
+  .mc-tree li, .mc-list li, .mc-scenes li { min-height: 2.75rem; }
+  .mc-scenes li { padding: 0; }
+  /* the view cube: bigger faces, no hover fade */
+  .mc-stage .cc-vc, .mc-stage .cc-vc svg { width: 10rem; }
+  .mc-stage .cc-vc svg { height: 10rem; }
+  .mc-stage .cc-vc { opacity: 1; }
+  .mc-stage .cc-vc .vc-ring-hit { stroke-width: 28; }
+  .mc-scenebar:not([hidden]) ~ .cc-vc.at-top-right { top: 3rem; }
+  /* menus and the context menu: room between rows */
+  .mc-menu-list { min-width: 16rem; }
+  .mc-menu-list button kbd { display: none; }
+  /* the panel headings read as the toggles they are */
+  .mc-sec-toggle { min-height: 2.75rem; margin: -.4rem 0; }
+  .mc-sec { padding-block: .6rem; }
+}
+
 /* ---- Check for 3D printing (0.5 SG.4) ---- */
 .mc-print p, .mc-print ul { margin: 0 0 .6rem; }
 .mc-print ul { padding-left: 1.1rem; }
