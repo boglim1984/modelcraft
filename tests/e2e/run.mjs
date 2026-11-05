@@ -34,7 +34,11 @@ const URL = opt('--url', null);
 
 /** Console/page messages that do NOT fail the run. Keep this list empty unless a message was actually observed. */
 const ALLOW = [
-  // (none observed so far)
+  // Observed here: devshell/serve.mjs never serves bootstrap-icons (the site shell's icon font comes from getcadcraft.com) and
+  // app-devices-studio.js is a getcadcraft.com script; both 404 in an offline dev shell and are not part of what this suite tests.
+  /\/assets\/vendor\/bootstrap-icons\//,
+  /\/assets\/js\/(app-devices-studio|skill-packs|app-addons-account)\.js/,   // getcadcraft.com site scripts, each observed 404 here
+  /^Failed to load resource: the server responded with a status of 404/,   // the bare 404 line Chromium logs beside those URLs
 ];
 const allowed = (text) => ALLOW.some((a) => (a instanceof RegExp ? a.test(text) : text.includes(a)));
 
@@ -87,6 +91,8 @@ async function main() {
   const server = await startServer();
   const browser = await chromium.launch(launchOptions());
   const context = await browser.newContext({ ...(devices['iPad Pro 11'] || {}), ...IPAD });
+  // Chromium's touch emulation reports maxTouchPoints 1; a real iPad reports 5, and gl-settings.js's isIPadLike() needs > 1
+  await context.addInitScript(() => { try { Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 }); } catch { /* read-only */ } });
   const page = await context.newPage();
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') { const t = m.text(); if (!allowed(t)) errors.push('console: ' + t); } });
