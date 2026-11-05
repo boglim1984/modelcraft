@@ -50,6 +50,7 @@ import { dynamicSummary } from './dwg-dynamic.js';   // 0.5 DB.11 (a byte-identi
 import { sunPosition } from './sun.js';
 import { ident, dist, add, sub, mul, dot, cross, norm } from './vec.js';
 import { el } from './ui-util.js';
+import { mountTouchUi, setLastPointerType, hitScale } from './touch-ui.js';   // iPad: folding panels, long-press titles, pick reach per pointer
 import { mountViewCube, mountAxisIcon } from './viewcube.js';
 import * as i18n from "./i18n.js";
 import { cameraCubeOptions } from './viewcube-camera.js';
@@ -724,7 +725,7 @@ function init(root) {
   ui.over.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || tools.name !== 'select' || !model.lights.size) return;
     const r = ui.over.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, vp = cam.viewProj();
-    let best = null, bd = 11;
+    let best = null, bd = 11 * hitScale();   // touch-ui.js: a finger reaches further than a mouse
     for (const [id, L] of model.lights) { const s2 = cam.project(L.p, vp); if (s2) { const d = Math.hypot(s2[0] - x, s2[1] - y); if (d < bd) { bd = d; best = id; } } }
     if (best === null) return;
     e.stopImmediatePropagation(); e.preventDefault();
@@ -841,6 +842,7 @@ function init(root) {
     ui.over.focus({ preventScroll: true });
     closeMenus();
     const p = pos(e);
+    setLastPointerType(e.pointerType);   // touch-ui.js: how far picks reach for this pointer
     if (e.pointerType === 'touch') {
       markTouch();
       touches.set(e.pointerId, p);
@@ -3939,6 +3941,7 @@ function init(root) {
     const goStatus = () => { window.ccAccess.follow(ui.msg, { max: 240 }); window.ccAccess.follow(ui.tip, { max: 160 }); };
     for (const f of [goAccess, goStatus]) { if (window.ccAccess) f(); else document.addEventListener('cc-access-ready', f, { once: true }); }
   }
+  mountTouchUi(root, { print });   // iPad (touch-ui.js): folding panel sections, a long press says a button's title
   window.modelcraft.shell = shell;
 }
 

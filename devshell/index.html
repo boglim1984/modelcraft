@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <script>
     (function () {
       var d = document.documentElement, s = null;
@@ -357,7 +357,7 @@
       </div>
 
   <aside class="mc-panel mc-left" aria-label="Outliner and components">
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="outliner" data-sec-open>
       <div class="mc-sec-head" data-tree-top title="Drop a group here to move it to the top level">
         <h2 class="mc-h">Outliner</h2>
         <button type="button" class="mc-linkbtn" data-close-ctx hidden>Close group</button>
@@ -367,7 +367,7 @@
       <ul class="mc-tree" data-tree></ul>
       <p class="mc-note" data-tree-empty data-keys-note="tree">Groups and components you make show here. Select geometry, then <kbd>G</kbd> makes a component, <kbd>Shift</kbd>+<kbd>G</kbd> a group.</p>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="comps">
       <div class="mc-sec-head">
         <h2 class="mc-h">Components</h2>
         <button type="button" class="mc-linkbtn" data-starter><i class="bi bi-grid" aria-hidden="true"></i> Starter library</button>
@@ -409,21 +409,21 @@
     <section class="mc-timeline" data-timeline data-phone="keep" aria-label="Animation timeline" hidden></section>
 
   <aside class="mc-panel mc-right" aria-label="Entity info, style and scenes">
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="info" data-sec-open>
       <h2 class="mc-h" data-info-h>Entity info</h2>
       <div data-info></div>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="colors">
       <h2 class="mc-h" id="mc-colors-h">Colors</h2>
       <div class="mc-palette" data-palette role="radiogroup" aria-labelledby="mc-colors-h"></div>
       <p class="mc-note" data-palette-note>Pick a color, then click faces, groups or components with Paint (B). With something selected, a click on a color paints the selection.</p>
     </section>
-        <section class="mc-sec">
+        <section class="mc-sec" data-sec="materials">
       <h2 class="mc-h" id="mc-mats-h">Materials</h2>
       <div class="mc-matlib" data-matlib role="radiogroup" aria-labelledby="mc-mats-h"></div>
       <p class="mc-note">Paint faces with brick, siding, roofing, wood, stone and more, like a color: pick one, then click faces. Textures show in the Shaded style and in rendered pictures; exports get each material’s color.</p>
     </section>
-        <section class="mc-sec" data-lights-sec>
+        <section class="mc-sec" data-lights-sec data-sec="lights">
       <h2 class="mc-h" id="mc-lights-h">Lights</h2>
       <div class="mc-lights-add" role="group" aria-labelledby="mc-lights-h">
         <button type="button" class="btn-line btn-sm-cc" data-light-add="point"><i class="bi bi-lightbulb" aria-hidden="true"></i> Lamp</button>
@@ -434,13 +434,13 @@
       <div class="mc-props" data-light-edit hidden></div>
       <p class="mc-note">Lamps light rendered pictures (Export › Render a picture…), most of all at night. Click Lamp, Spotlight or Light panel, then click where it goes; click a lamp’s mark in the view to change it.</p>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="tags">
       <h2 class="mc-h" id="mc-tags-h">Tags</h2>
       <ul class="mc-list mc-tags" data-tags aria-labelledby="mc-tags-h"></ul>
       <button type="button" class="mc-linkbtn" data-tag-add><i class="bi bi-plus-lg" aria-hidden="true"></i> Add tag</button>
       <p class="mc-note">Give groups and components a tag in Entity info, then hide or show everything with that tag here.</p>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="style">
       <h2 class="mc-h">Style</h2>
       <div class="mc-props" data-style>
         <label for="mc-mode">Faces</label>
@@ -489,27 +489,27 @@
         <p class="mc-note span" data-sun-info></p>
       </fieldset>
     </section>
-        <section class="mc-sec" data-nurbs-sec>
+        <section class="mc-sec" data-nurbs-sec data-sec="nurbs">
       <h2 class="mc-h" id="mc-nurbs-h">Surfaces</h2>
       <div data-nurbs aria-labelledby="mc-nurbs-h">
         <p class="mc-note">NURBS curves and untrimmed surfaces with measured continuity (G0, G1, G2). Sizes are in millimeters.</p>
         <button type="button" class="btn-line btn-sm-cc" data-nurbs-open><i class="bi bi-bezier2" aria-hidden="true"></i> Open the Surfaces panel</button>
       </div>
     </section>
-        <section class="mc-sec" data-nodes-sec>
+        <section class="mc-sec" data-nodes-sec data-sec="nodes">
       <h2 class="mc-h" id="mc-nodes-h">Nodes</h2>
       <div aria-labelledby="mc-nodes-h">
         <p class="mc-note">Build a model by wiring nodes: numbers into points, points into curves, curves into surfaces. Every node is also a line of CraftScript.</p>
         <button type="button" class="btn-line btn-sm-cc" data-nodes-open><i class="bi bi-diagram-3" aria-hidden="true"></i> Nodes…</button>
       </div>
     </section>
-        <section class="mc-sec" data-issues>
+        <section class="mc-sec" data-issues data-sec="issues">
       <h2 class="mc-h" id="mc-issues-h">Issues</h2>
       <ul class="mc-list mc-issues" data-issues-list aria-labelledby="mc-issues-h"></ul>
       <p class="mc-note" data-issues-empty>Issues you place in VR (Views › Review in VR) show here, each with a picture of what you saw.</p>
       <button type="button" class="btn-line btn-sm-cc" data-issues-bcf disabled>Save as BCF</button>
     </section>
-    <section class="mc-sec">
+    <section class="mc-sec" data-sec="scenes">
       <div class="mc-sec-head">
         <h2 class="mc-h">Scenes</h2>
         <button type="button" class="mc-linkbtn" data-scene-add><i class="bi bi-plus-lg" aria-hidden="true"></i> Add scene</button>

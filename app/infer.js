@@ -19,6 +19,7 @@ import { BoxTree, boxesOf } from './bvh.js';
 import { faceTris, faceNormal } from './model.js';
 import { FL_HIDE, FL_SHARP } from './mesh.js';
 import { t } from "./i18n.js";
+import { hitScale } from './touch-ui.js';   // iPad: a finger's pick reaches further than a mouse's
 
 /** Inference tips in the page's language (getters: read when asked for). */
 export const TIPS = Object.defineProperties({}, Object.fromEntries(['end', 'mid', 'center', 'guidept', 'origin', 'edge', 'guide', 'face', 'ground', 'plane', 'axis-x', 'axis-y', 'axis-z', 'parallel', 'perp', 'lock'].map((k) => [k, { get: () => t('m3d.tip.' + k.toLowerCase().replace(/[^a-z0-9]+/g, '_')), enumerable: true }])));
@@ -296,7 +297,7 @@ const nearEdges = (sc, cam, ray, px) => (sc.near ? sc.near(cam, ray, px) : sc.ed
  * snap (false: no points, axes or edges — only a locked direction, faces, the drawing plane and the ground).
  */
 export function infer(sc, cam, x, y, opts = {}) {
-  const R = opts.radius ?? 12;
+  const R = opts.radius ?? 12 * hitScale();
   const ray = cam.ray(x, y);
   const vp = cam.viewProj();
   const axes = opts.axes || { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
@@ -458,7 +459,7 @@ function horizontalOrFacing(cam, p) {
 }
 
 /** The thing a click selects inside the open context (`path`): {t: 'e'|'f'|'i'|'g', id, …} or null. */
-export function pick(sc, cam, x, y, { path = [], radius = 7 } = {}) {
+export function pick(sc, cam, x, y, { path = [], radius = 7 * hitScale() } = {}) {
   const ray = cam.ray(x, y), vp = cam.viewProj();
   const inCtx = (o) => startsWith(o.path, path);
   const asSel = (o, t) => (o.path.length > path.length ? { t: 'i', id: o.path[path.length] } : { t, id: o.id });
@@ -720,7 +721,7 @@ export function sectionLayout(model, s) {
   return { corners, arrows: corners.map((c) => [c, add(c, mul(n, k))]) };
 }
 /** The section plane under screen point x, y ({t: 's', id} or null): on its outline or its arrows. */
-export function pickSection(model, cam, x, y, radius = 6) {
+export function pickSection(model, cam, x, y, radius = 6 * hitScale()) {
   if (!model.sections?.size || model.sectionView?.planes === false) return null;
   const vp = cam.viewProj();
   let best = null;
@@ -742,7 +743,7 @@ export function setDimTextSize(px) { dimPx = Number.isFinite(px) && px >= 8 && p
 export const dimTextSize = () => dimPx;
 export const dimTextBox = (M, text) => { const k = dimPx / 12, w = (text.length * 7) * k + 12, h = 20 * k; return { x: M[0] - w / 2, y: M[1] - h / 2, w, h }; };
 /** The dimension under screen point x, y ({t: 'd', id} or null): on its line or its text. fmt(m) writes a length. */
-export function pickDim(model, cam, x, y, fmt, radius = 6) {
+export function pickDim(model, cam, x, y, fmt, radius = 6 * hitScale()) {
   if (!model.dims?.size) return null;
   const vp = cam.viewProj();
   let best = null;
