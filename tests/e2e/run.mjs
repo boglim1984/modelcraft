@@ -168,6 +168,31 @@ async function main() {
     check('viewport pixels changed after the pinch (or camera did)', px1 !== px0 || cam1 !== cam0);
     check('touch marked the UI (.is-touch)', touched);
 
+    // ---- touch navigation (viewport-gestures): one finger orbits, two fingers pan, a two-finger tap undoes ----
+    const camA = await camSnap();
+    await touch('touchStart', [[cx, cy]]);
+    await sleep(40);
+    for (let i = 1; i <= 10; i++) { await touch('touchMove', [[cx + i * 12, cy + i * 6]]); await sleep(25); }
+    await touch('touchEnd', []);
+    await page.waitForTimeout(350);
+    const camB = await camSnap();
+    check('one-finger drag orbits (camera changed)', camB !== camA, camB === camA ? 'camera state identical' : 'camera state differs');
+    await touch('touchStart', [[cx - 60, cy], [cx + 60, cy]]);
+    await sleep(40);
+    for (let i = 1; i <= 10; i++) { await touch('touchMove', [[cx - 60 + i * 10, cy + i * 8], [cx + 60 + i * 10, cy + i * 8]]); await sleep(25); }
+    await touch('touchEnd', []);
+    await page.waitForTimeout(350);
+    const camC = await camSnap();
+    check('two-finger parallel drag pans (camera changed)', camC !== camB, camC === camB ? 'camera state identical' : 'camera state differs');
+    const edgesBeforeUndo = await page.evaluate(() => window.modelcraft.model.root.edges.size);
+    await touch('touchStart', [[cx - 40, cy], [cx + 40, cy]]);
+    await sleep(60);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(400);
+    const edgesAfterUndo = await page.evaluate(() => window.modelcraft.model.root.edges.size);
+    check('two-finger tap undoes the rectangle', edgesAfterUndo < edgesBeforeUndo, `edges ${edgesBeforeUndo}→${edgesAfterUndo}`);
+    await shot('03b-touch-nav');
+
     // ---- a finger taps a toolbar button ----
     // the pinch's fingers are up and the touch bar has appeared (markTouch): let the layout settle, then measure and tap
     await page.waitForTimeout(250);
