@@ -444,10 +444,11 @@ html.cc-compact.cc-land .mc-tl-lanes { max-height: 4rem; }
 .mc.is-touch .mc-vcb-num { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 .5rem; font: inherit; font-size: .875rem; font-weight: 700; letter-spacing: .04em; color: var(--ink); background: var(--sheet); border: var(--pen-1) solid var(--line); border-radius: var(--radius); cursor: pointer; }
 .mc.is-touch .mc-vcb-num:active { background: var(--sheet-2); border-color: var(--action); }
 .mc.is-touch .mc-vcb:focus-within .mc-dim-units { display: flex; }
-.mc-dim-units { position: absolute; right: 0; bottom: calc(100% + .5rem); gap: .25rem; padding: .25rem; background: var(--sheet); border: var(--pen-1) solid var(--line); border-radius: var(--radius); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); z-index: 6; }
+/* z-index 20: above the site shell's panel-resize handles (.shell-split, z 15), which span the stage's full height and would otherwise swallow taps on the chips / the floating button */
+.mc-dim-units { position: absolute; right: 0; bottom: calc(100% + .5rem); gap: .25rem; padding: .25rem; background: var(--sheet); border: var(--pen-1) solid var(--line); border-radius: var(--radius); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); z-index: 20; }
 .mc-dim-unit { min-width: 44px; min-height: 44px; padding: 0 .6rem; font: inherit; font-size: 1rem; font-weight: 600; color: var(--ink); background: var(--sheet); border: var(--pen-1) solid var(--line); border-radius: var(--radius); font-variant-numeric: tabular-nums; cursor: pointer; }
 .mc-dim-unit:active { background: var(--sheet-2); border-color: var(--action); }
-.mc.is-touch .mc-dim-tap { display: inline-flex; align-items: center; gap: .4rem; position: absolute; right: .75rem; bottom: 4.25rem; min-height: 48px; padding: 0 1rem; font: inherit; font-size: .9375rem; font-weight: 600; color: var(--sheet); background: var(--action); border: var(--pen-1) solid var(--action); border-radius: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, .2); z-index: 4; cursor: pointer; }
+.mc.is-touch .mc-dim-tap { display: inline-flex; align-items: center; gap: .4rem; position: absolute; right: .75rem; bottom: 4.25rem; min-height: 48px; padding: 0 1rem; font: inherit; font-size: .9375rem; font-weight: 600; color: var(--sheet); background: var(--action); border: var(--pen-1) solid var(--action); border-radius: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, .2); z-index: 20; cursor: pointer; }
 .mc.is-touch .mc-dim-tap[hidden] { display: none; }
 .mc.is-touch .mc-dim-tap .bi { font-size: 1.25rem; }
 .mc.is-touch .mc-dim-tap:active { filter: brightness(.9); }
