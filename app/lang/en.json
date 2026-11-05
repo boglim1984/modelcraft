@@ -352,6 +352,8 @@
   "app.touch.done": "Done.",
   "app.touch.hold": "Hold still on something to finish a tool; tap to click.",
   "app.touch.orbit": "Drag to orbit; lift to stop.",
+  "app.touch.undo": "Undo (two-finger tap).",
+  "app.touch.redo": "Redo (three-finger tap).",
   "app.tab.none": "Select a group or component, then Tab opens it.",
   "app.lock.red": "Locked to the red axis. Press the same key to unlock.",
   "app.lock.green": "Locked to the green axis. Press the same key to unlock.",
