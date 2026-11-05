@@ -110,6 +110,8 @@ export async function start(sc, { root = document.body } = {}) {
     show();
   });
   canvas.addEventListener('pointerup', () => { drag = null; });
+  for (const n of ['pointercancel', 'lostpointercapture']) canvas.addEventListener(n, () => { drag = null; });   // a lost pointer (pointercancel, a capture taken away, an app switch) ends the drag
+  canvas.style.touchAction = 'none';
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (!walker) { orb.zoom(Math.exp(e.deltaY * 0.001)); show(); } }, { passive: false });
   new ResizeObserver(() => { rt.resize(canvas.clientWidth || 1, canvas.clientHeight || 1); show(); }).observe(canvas);
