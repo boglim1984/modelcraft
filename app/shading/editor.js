@@ -70,6 +70,7 @@ export class NodeEditor {
     this.root = el('div', { className: 'cc-ne' }, this.bar, this.view);
     this.box.append(this.root);
     this.view.addEventListener('pointerdown', (e) => this.down(e));
+    this.view.style.touchAction = 'none';   // a finger drags nodes and pans the graph; the page does not scroll under it
     this.view.addEventListener('wheel', (e) => this.wheel(e), { passive: false });
     this.view.addEventListener('keydown', (e) => this.key(e));
     this.ro = new ResizeObserver(() => this.drawWires());
@@ -336,8 +337,8 @@ export class NodeEditor {
     let moved = false;
     this.view.setPointerCapture(e.pointerId);
     const mv = (ev) => { const dx = ev.clientX - sx, dy = ev.clientY - sy; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; this.pan = { x: p0.x + dx, y: p0.y + dy }; this.place(); };
-    const up = () => { this.view.removeEventListener('pointermove', mv); this.view.removeEventListener('pointerup', up); if (!moved) { this.sel.clear(); this.selLink = -1; this.markSel(); } };
-    this.view.addEventListener('pointermove', mv); this.view.addEventListener('pointerup', up);
+    const up = () => { this.view.removeEventListener('pointermove', mv); this.view.removeEventListener('pointerup', up); this.view.removeEventListener('pointercancel', up); if (!moved) { this.sel.clear(); this.selLink = -1; this.markSel(); } };
+    this.view.addEventListener('pointermove', mv); this.view.addEventListener('pointerup', up); this.view.addEventListener('pointercancel', up);
   }
   dragNode(e, id) {
     if (!this.sel.has(id)) { this.sel = e.shiftKey ? new Set([...this.sel, id]) : new Set([id]); this.selLink = -1; this.markSel(); }
@@ -354,13 +355,13 @@ export class NodeEditor {
       this.drawWires();
     };
     const up = () => {
-      this.view.removeEventListener('pointermove', mv); this.view.removeEventListener('pointerup', up);
+      this.view.removeEventListener('pointermove', mv); this.view.removeEventListener('pointerup', up); this.view.removeEventListener('pointercancel', up);
       if (!moved) return;
       this.undoStack.push(before); this.redoStack = [];
       this.render();
       this.onChange(this.graph, 'shading.ed.undo_move');
     };
-    this.view.addEventListener('pointermove', mv); this.view.addEventListener('pointerup', up);
+    this.view.addEventListener('pointermove', mv); this.view.addEventListener('pointerup', up); this.view.addEventListener('pointercancel', up);
   }
   dragLink(e, sock) {
     let fromId = Number(sock.dataset.node), fromOut = sock.dataset.sock;
@@ -381,7 +382,7 @@ export class NodeEditor {
     this.view.setPointerCapture(e.pointerId);
     const mv = (ev) => { this.temp.b = this.toWorld(ev); this.drawWires(); };
     const up = (ev) => {
-      this.view.removeEventListener('pointermove', mv); this.view.removeEventListener('pointerup', up);
+      this.view.removeEventListener('pointermove', mv); this.view.removeEventListener('pointerup', up); this.view.removeEventListener('pointercancel', up);
       this.temp = null;
       const hit = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.cc-ne-sock[data-dir="in"]');
       const toId = hit ? Number(hit.dataset.node) : null, toIn = hit ? hit.dataset.sock : null;
@@ -396,7 +397,7 @@ export class NodeEditor {
         this.onChange(this.graph, hit ? 'shading.ed.undo_link' : 'shading.ed.undo_unlink');
       } else this.render();
     };
-    this.view.addEventListener('pointermove', mv); this.view.addEventListener('pointerup', up);
+    this.view.addEventListener('pointermove', mv); this.view.addEventListener('pointerup', up); this.view.addEventListener('pointercancel', up);
   }
   wheel(e) {
     if (e.target.closest?.('input, select')) return;   // i18n-ignore: selectors
