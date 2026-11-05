@@ -88,6 +88,7 @@ import { modPanel } from './mesh/mod-panel.js';
 import { cleanGroup, canModify, modifierDef, setModifiers, GROUP_TYPES, newMod } from './group-mods.js';   // 0.8 GH.2: the stack on a group or component
 import { setMeshHooks, meshDef } from './model.js';
 import { Mesh } from './mesh.js';
+import { blockPageZoom } from './touch-gestures.js';   // iPad: the page never zooms under the fingers
 const { t } = i18n;
 /** The display unit in words, lower case ("feet and inches", "millimeters"). */
 const unitWords = (u) => t('app.unit.' + String(u).replace('-', '_'));
@@ -272,7 +273,7 @@ function init(root) {
     render: async () => { const { mcScene } = await import('./render-mc.js'); return { scene: (s) => mcScene(model, cam, view.style, s), viewSize: () => ({ w: ui.gl.clientWidth, h: ui.gl.clientHeight }), settings: () => renderSettings, fileBase: base, download: (blob, name) => download(blob, name, blob.type || 'application/octet-stream'), appName: 'ModelCraft' }; } });
 
   // ---- settings (Settings › ModelCraft; per viewer conveniences only) ----
-  const SET_DEFAULTS = { keys: 'sketchup', scroll: 'auto', touch2: 'pan', snap: true, collide: true, corner: 'cube', bed: '', orbitAt: 'cursor', orbitSpeed: 1, panSpeed: 1 };
+  const SET_DEFAULTS = { keys: 'sketchup', scroll: 'auto', touch1: 'orbit', touch2: 'pan', snap: true, collide: true, corner: 'cube', bed: '', orbitAt: 'cursor', orbitSpeed: 1, panSpeed: 1 };
   const SPEED = (x) => Number.isFinite(x) && x >= 0.25 && x <= 3;   // 0.7.1 MC-ORBIT-CURSOR: the speed sliders' range
   const settings = (() => {
     const out = { ...SET_DEFAULTS };
@@ -281,6 +282,7 @@ function init(root) {
       if (v.keys === 'blender' || v.keys === 'sketchup') out.keys = v.keys;
       if (['auto', 'mouse', 'trackpad'].includes(v.scroll)) out.scroll = v.scroll;
       if (['pan', 'orbit'].includes(v.touch2)) out.touch2 = v.touch2;
+      if (['orbit', 'draw'].includes(v.touch1)) out.touch1 = v.touch1;   // iPad: one finger orbits (default) | draws (the tool)
       if (typeof v.snap === 'boolean') out.snap = v.snap;
       if (typeof v.collide === 'boolean') out.collide = v.collide;
       if (['cube', 'axes', 'none'].includes(v.corner)) out.corner = v.corner;
@@ -311,6 +313,7 @@ function init(root) {
     if (settingsDlg) {
       settingsDlg.querySelectorAll('input[name="mcKeys"]').forEach((r) => { r.checked = r.value === settings.keys; });
       settingsDlg.querySelectorAll('input[name="mcScroll"]').forEach((r) => { r.checked = r.value === settings.scroll; });
+      settingsDlg.querySelectorAll('input[name="mcTouch1"]').forEach((r) => { r.checked = r.value === settings.touch1; });
       settingsDlg.querySelectorAll('input[name="mcTouch2"]').forEach((r) => { r.checked = r.value === settings.touch2; });
       const sn = settingsDlg.querySelector('input[name="mcSnap"]'), co = settingsDlg.querySelector('input[name="mcCollide"]');
       if (sn) sn.checked = settings.snap;
@@ -342,6 +345,7 @@ function init(root) {
       const t = e.target;
       if (t.name === 'mcKeys') setKeys(t.value);
       else if (t.name === 'mcScroll') setSetting('scroll', t.value);
+      else if (t.name === 'mcTouch1') setSetting('touch1', t.value);
       else if (t.name === 'mcTouch2') setSetting('touch2', t.value);
       else if (t.name === 'mcSnap') setSetting('snap', t.checked);
       else if (t.name === 'mcCollide') setSetting('collide', t.checked);
@@ -833,9 +837,11 @@ function init(root) {
     loupe.hide();
     navigator.vibrate?.(15);
     if (tools.tool.busy) { if (!tools.tool.finish?.()) tools.escape(); print(t('app.touch.done')); view.invalidate(); }
+    else if (settings.touch1 !== 'draw') openCtxMenu({ x: tap.x, y: tap.y }, true);   // one finger already orbits: a hold is the menu
     else { tap.orbit = { x: tap.x, y: tap.y }; print(t('app.touch.orbit')); }
   };
   ui.over.addEventListener('contextmenu', (e) => e.preventDefault());
+  blockPageZoom(document, ui.stage);   // iPad: a pinch or a two-finger drag never zooms the page
   let penBack = null;   // the tool to go back to when the pen's tip comes down after its eraser end
   const penEraser = (e) => e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) !== 0);
   ui.over.addEventListener('pointerdown', (e) => {
@@ -854,13 +860,17 @@ function init(root) {
         const pts = [...touches.values()];
         const c = { x: pts.reduce((a, q) => a + q.x, 0) / pts.length, y: pts.reduce((a, q) => a + q.y, 0) / pts.length };
         if (pinch?.raf) cancelAnimationFrame(pinch.raf);
-        pinch = { n: pts.length, c, d: pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0, raf: 0, pivot: camPivot(c.x, c.y) };
+        const was = pinch;
+        pinch = { n: pts.length, c, d: pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0, raf: 0, pivot: camPivot(c.x, c.y),
+          // an n-finger tap (two = undo, three = redo): every finger down and up within 250 ms, none moving 10 px — the camera waits that long
+          t0: was?.t0 ?? e.timeStamp, start: new Map([...(was?.start || []), [e.pointerId, p]]), maxN: Math.max(was?.maxN || 0, pts.length), moved: was?.moved || false, armed: was?.armed || false };
+        if (!was) for (const [id, q] of touches) pinch.start.set(id, q);
         return;
       }
       ui.over.setPointerCapture(e.pointerId);
       host.mouse = p;
       tools.move({ ...p });
-      tap = { id: e.pointerId, x: p.x, y: p.y, started: false, done: false, orbit: null, timer: setTimeout(longPress, LONG_MS) };
+      tap = { id: e.pointerId, x: p.x, y: p.y, started: false, done: false, orbit: null, pivot: null, timer: setTimeout(longPress, LONG_MS) };
       loupe.show(p);
       return;
     }
@@ -921,6 +931,13 @@ function init(root) {
           const c = { x: pts.reduce((a, q) => a + q.x, 0) / pts.length, y: pts.reduce((a, q) => a + q.y, 0) / pts.length };
           const d = pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
           if (pts.length !== pinch.n) { pinch.n = pts.length; pinch.c = c; pinch.d = d; return; }
+          if (!pinch.armed) {
+            const far = [...touches].some(([id, q]) => { const s0 = pinch.start.get(id); return !s0 || Math.hypot(q.x - s0.x, q.y - s0.y) >= 10; });
+            if (far) pinch.moved = true;
+            if (far || e.timeStamp - pinch.t0 > 250) pinch.armed = true;
+            pinch.c = c; pinch.d = d;   // the drag starts from here (a tap in the making holds the camera)
+            return;
+          }
           // two fingers pan (or orbit, settings.touch2) and pinch; three do the other
           const move = (pts.length >= 3) === (settings.touch2 === 'orbit') ? 'pan' : 'orbit';
           if (c.x !== pinch.c.x || c.y !== pinch.c.y) cam[move](c.x - pinch.c.x, c.y - pinch.c.y, pinch.pivot);
@@ -933,7 +950,7 @@ function init(root) {
       if (pinch) return;
       if (tap && e.pointerId === tap.id && tap.orbit) {
         // held still on nothing, then moved: one-finger orbit
-        cam.orbit(p.x - tap.orbit.x, p.y - tap.orbit.y);
+        cam.orbit(p.x - tap.orbit.x, p.y - tap.orbit.y, tap.pivot);
         tap.orbit = { x: p.x, y: p.y };
         view.invalidate();
         return;
@@ -942,6 +959,11 @@ function init(root) {
         host.mouse = p;
         if (!tap.started) {
           if (Math.hypot(p.x - tap.x, p.y - tap.y) < MOVE_PX) { tools.move({ ...p }); loupe.show(p); return; }
+          if (settings.touch1 !== 'draw') {   // iPad: one finger orbits (a tap is still a click, a hold the menu)
+            clearTimeout(tap.timer); tap.done = true; loupe.hide(); hideHint();
+            tap.orbit = { x: p.x, y: p.y }; tap.pivot = camPivot(tap.x, tap.y);
+            return;
+          }
           // it moves: a press–drag from where the finger went down
           clearTimeout(tap.timer); tap.started = true;
           hideHint();
@@ -971,7 +993,17 @@ function init(root) {
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
       loupe.hide();
-      if (pinch) { if (!touches.size) pinch = null; return; }
+      if (pinch) {
+        const s0 = pinch.start.get(e.pointerId);
+        if (!s0 || Math.hypot(p.x - s0.x, p.y - s0.y) >= 10) pinch.moved = true;
+        if (!touches.size) {
+          const pz = pinch; pinch = null;
+          if (!pz.armed && !pz.moved && e.timeStamp - pz.t0 <= 250 && e.type === 'pointerup' && (pz.maxN === 2 || pz.maxN === 3)) {
+            act(pz.maxN === 2 ? 'undo' : 'redo'); print(t(pz.maxN === 2 ? 'app.touch.undo' : 'app.touch.redo')); navigator.vibrate?.(10); view.invalidate();
+          }
+        }
+        return;
+      }
       if (tap && e.pointerId === tap.id) {
         const t = tap;
         clearTimeout(t.timer); tap = null;
