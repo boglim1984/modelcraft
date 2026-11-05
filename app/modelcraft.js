@@ -65,6 +65,7 @@ import { mountTimeline } from './timeline.js';   // 0.6 LC.10: the animation tim
 import { mountXrMc } from './xr-mc.js';   // 0.6 LC.19: review in a headset (xr/), the Issues list
 import { action3d, wheelFactor } from './input-mouse.js';
 import { markPen, unmarkPen, palmReject, pointerPos, onRelease } from './input-pointer.js';   // iPad: Pointer Events only; the Pencil is precise, a palm beside it is ignored
+import { createModBar } from './modbar.js';   // iPad: sticky Shift / Ctrl / Alt, Snap and Ortho without a keyboard
 import { mountMachineCard, benchParam, openBench } from './compute-mc.js';   // 0.7 CU.1: Settings › Rendering › Your machine; CU.8: ?bench=render
 import { GUIDE_STEPS, guideStep, guideFacts } from './firstmodel.js';   // 0.6 LC.21: the guided first model   // 0.5 IP.3: the menu style's buttons and wheel (input-modelcraft.js)
 import { getWorkspace, listWorkspaces, toolbarGroups, switcher as wsSwitcher, MODEL_GROUPS, workspaceOfCmd } from './workspaces.js';   // 0.7: Model · Mesh · …
@@ -743,7 +744,18 @@ function init(root) {
 
   // ---- pointer input ----
   const pos = (e) => pointerPos(ui.over, e);   // a pen adds pressure (MD.7 sculpting) and tilt; a mouse or finger has no pressure field
-  const mods = (e) => ({ shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, button: e.button, time: e.timeStamp });
+  // the modifier bar (modbar.js; iPad without a keyboard): its held keys reach the tools as the keyboard's would — Shift mid-gesture
+  // locks the inference as the document keydown does (tools.key), letting go as its keyup (tools.keyUp)
+  const modBar = createModBar(root, {
+    onKey: (name, down) => {
+      if (down) tools.key(name, { ...cursorEv(), shift: name === 'Shift', ctrl: name === 'Control', alt: name === 'Alt' });
+      else tools.keyUp(name);
+      if (tools.tool.lastEv) tools.tool.hover?.(modBar.with(tools.tool.lastEv));
+      view.invalidate();
+    },
+    onToggle: (id) => { if (id === 'snap') toggle('snap'); else if (id === 'ortho') perspBtn.click(); },
+  });
+  const mods = (e) => { const m = modBar.state(); return { shift: e.shiftKey || m.shift, ctrl: e.ctrlKey || e.metaKey || m.ctrl, alt: e.altKey || m.alt, button: e.button, time: e.timeStamp }; };
   let camDrag = null;
   let ctxPress = null;   // 0.7.1 MC-RIGHTCLICK-MENU: the menu button is down ({x, y, b}); released in place = the context menu
   /**
@@ -871,6 +883,10 @@ function init(root) {
   ui.over.addEventListener('contextmenu', (e) => e.preventDefault());
   blockPageZoom(document, ui.stage);   // iPad: a pinch or a two-finger drag never zooms the page
   let penBack = null;   // the tool to go back to when the pen's tip comes down after its eraser end
+  let penHold = null, penHoldFired = null;   // a pen tip held still ({id, x, y, timer}) → the context menu; the pointer whose lift is spent
+  const PEN_HOLD_MS = 600, PEN_HOLD_PX = 6;
+  const penHoldCancel = () => { if (penHold) { clearTimeout(penHold.timer); penHold = null; } };
+  ui.over.addEventListener('pointercancel', (e) => { if (penHold && e.pointerId === penHold.id) penHoldCancel(); });   // the pen left or the browser took the gesture: no hold
   const penEraser = (e) => e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) !== 0);
   ui.over.addEventListener('pointerdown', (e) => {
     ui.over.focus({ preventScroll: true });
@@ -914,6 +930,20 @@ function init(root) {
         return;
       }
       if (penBack && e.button === 0) { const back = penBack; penBack = null; if (tools.name === 'erase') setTool(back); }
+      // a Pencil has no right button: its tip held still for 600 ms opens the context menu (a press that began a tool
+      // action lets go of it first; the lift that follows does nothing)
+      if (e.button === 0 && !tools.tool.busy) {
+        penHoldCancel();
+        penHold = { id: e.pointerId, x: p.x, y: p.y, timer: setTimeout(() => {
+          const h = penHold; penHold = null;
+          if (!h || !ui.over.hasPointerCapture?.(h.id)) return;   // the pen left (pointercancel)
+          if (tools.tool.busy) tools.escape();
+          penHoldFired = h.id;
+          openCtxMenu({ x: h.x, y: h.y }, true);
+          navigator.vibrate?.(15);
+          view.invalidate();
+        }, PEN_HOLD_MS) };
+      }
     }
     // Blender style: right-click cancels what a tool is doing; Alt + left-drag orbits (Alt+Shift pans) for
     // trackpads and mice without a middle button; Ctrl + middle-drag zooms
@@ -1004,6 +1034,7 @@ function init(root) {
       if (tap?.done) return;
     }
     host.mouse = p;
+    if (penHold && e.pointerId === penHold.id && Math.hypot(p.x - penHold.x, p.y - penHold.y) > PEN_HOLD_PX) penHoldCancel();   // the pen moved: a drag, not a hold
     if (ctxPress) return;   // 0.7.1: a right button held for the context menu
     if (camDrag) {
       const dx = p.x - camDrag.x, dy = p.y - camDrag.y;
@@ -1042,6 +1073,8 @@ function init(root) {
       }
       return;
     }
+    if (penHold && e.pointerId === penHold.id) penHoldCancel();
+    if (penHoldFired === e.pointerId) { penHoldFired = null; return; }   // the lift after a pen hold opened the context menu
     if (ctxPress && e.button === ctxPress.b) {   // 0.7.1: a click (no drag) of the menu button opens the context menu
       const c = ctxPress;
       ctxPress = null;
@@ -1897,6 +1930,22 @@ function init(root) {
     print(cam.persp ? t('app.persp.on') : t('app.persp.off'));
     view.invalidate();
   });
+  // the modifier bar's Snap and Ortho show the state of the buttons they click (the status bar's Snap, Views › Perspective),
+  // however it changes; its held keys reach every tool event (the finger paths pass no keyboard state), letting go after up
+  {
+    const snapBtn = root.querySelector('[data-mc-toggle="snap"]');
+    const syncModBar = () => {
+      modBar.set('snap', snapBtn ? snapBtn.getAttribute('aria-pressed') === 'true' : !!settings.snap);
+      modBar.set('ortho', perspBtn.getAttribute('aria-checked') === 'false');
+    };
+    syncModBar();
+    if (typeof MutationObserver === 'function') {
+      const mo = new MutationObserver(syncModBar);
+      if (snapBtn) mo.observe(snapBtn, { attributes: true, attributeFilter: ['aria-pressed'] });
+      mo.observe(perspBtn, { attributes: true, attributeFilter: ['aria-checked'] });
+    }
+    modBar.wrap(tools);
+  }
   const presentBtn = $('[data-present]');
   function setPresentation(on) {
     presentation = !!on;

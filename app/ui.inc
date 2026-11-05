@@ -268,6 +268,15 @@ $__views = ['iso', 'top', 'front', 'right', 'back', 'left', 'bottom'];   // labe
       <button type="button" class="mc-tool" data-touch="cancel"><i class="bi bi-x-lg" aria-hidden="true"></i><span><?= Lang::e('ui.touch.cancel') ?></span></button>
       <button type="button" class="mc-tool" data-touch="undo"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span><?= Lang::e('ui.touch.undo') ?></span></button>
     </div>
+    <?php /* The modifier bar (modbar.js): sticky Shift / Ctrl / Alt, Snap and Ortho for an iPad without a keyboard; shown on .is-touch */ ?>
+    <div class="mc-modbar" data-modbar role="toolbar" aria-label="<?= Lang::e('ui.mod.aria') ?>">
+      <button type="button" class="mc-tool" data-mod="shift" aria-pressed="false" title="<?= Lang::e('ui.mod.shift.title') ?>"><i class="bi bi-shift" aria-hidden="true"></i><span><?= Lang::e('ui.mod.shift') ?></span></button>
+      <button type="button" class="mc-tool" data-mod="ctrl" aria-pressed="false" title="<?= Lang::e('ui.mod.ctrl.title') ?>"><i class="bi bi-command" aria-hidden="true"></i><span><?= Lang::e('ui.mod.ctrl') ?></span></button>
+      <button type="button" class="mc-tool" data-mod="alt" aria-pressed="false" title="<?= Lang::e('ui.mod.alt.title') ?>"><i class="bi bi-option" aria-hidden="true"></i><span><?= Lang::e('ui.mod.alt') ?></span></button>
+      <span class="mc-modbar-sep" aria-hidden="true"></span>
+      <button type="button" class="mc-tool" data-mod="snap" aria-pressed="true" title="<?= Lang::e('ui.snap.title') ?>"><i class="bi bi-magnet" aria-hidden="true"></i><span><?= Lang::e('ui.mod.snap') ?></span></button>
+      <button type="button" class="mc-tool" data-mod="ortho" aria-pressed="false" title="<?= Lang::e('ui.mod.ortho.title') ?>"><i class="bi bi-grid-3x3" aria-hidden="true"></i><span><?= Lang::e('ui.mod.ortho') ?></span></button>
+    </div>
   </section>
 
   <?php /* Animation (0.6 LC.10, session lc-model): the timeline under the view, built by timeline.js; hidden until Views › Timeline.
