@@ -851,6 +851,7 @@ function init(root) {
   let penHold = null, penHoldFired = null;   // a pen tip held still ({id, x, y, timer}) → the context menu; the pointer whose lift is spent
   const PEN_HOLD_MS = 600, PEN_HOLD_PX = 6;
   const penHoldCancel = () => { if (penHold) { clearTimeout(penHold.timer); penHold = null; } };
+  ui.over.addEventListener('pointercancel', (e) => { if (penHold && e.pointerId === penHold.id) penHoldCancel(); });   // the pen left or the browser took the gesture: no hold
   const penEraser = (e) => e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) !== 0);
   ui.over.addEventListener('pointerdown', (e) => {
     ui.over.focus({ preventScroll: true });
