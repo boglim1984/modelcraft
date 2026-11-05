@@ -6,6 +6,7 @@
  * resets them on "cc-settings-reset".
  *   keys      Push-pull style (default) / Modeler style (stored "sketchup" / "blender"): shortcut keys and mouse buttons
  *   scroll    auto (default) / mouse (the wheel zooms) / trackpad (two fingers orbit, Shift pans, pinch zooms)
+ *   touch1    one finger orbits (default; iPad) / one finger draws with the tool
  *   touch2    two fingers pan (default; three orbit) / two fingers orbit (three pan); both pinch-zoom
  *   snap      snap to points, edges and axes (default on; also the Snap button in the status bar)
  *   collide   solids stop where they touch instead of passing through (default on; also the status bar button)
@@ -33,6 +34,14 @@
     <label><input type="radio" name="mcScroll" value="trackpad"> <i class="bi bi-hand-index" aria-hidden="true"></i> <?= Lang::e('set.scroll.trackpad') ?></label>
   </div>
   <p class="shell-hint-text"><?= Lang::e('set.scroll.hint') ?></p>
+</fieldset>
+<fieldset class="shell-set">
+  <legend><?= Lang::e('set.touch1') ?></legend>
+  <div class="shell-seg mc-set-seg2" role="radiogroup" aria-label="<?= Lang::e('set.touch1') ?>">
+    <label><input type="radio" name="mcTouch1" value="orbit"> <i class="bi bi-arrow-repeat" aria-hidden="true"></i> <?= Lang::e('set.touch1.orbit') ?></label>
+    <label><input type="radio" name="mcTouch1" value="draw"> <i class="bi bi-pencil" aria-hidden="true"></i> <?= Lang::e('set.touch1.draw') ?></label>
+  </div>
+  <p class="shell-hint-text"><?= Lang::e('set.touch1.hint') ?></p>
 </fieldset>
 <fieldset class="shell-set">
   <legend><?= Lang::e('set.touch2') ?></legend>
