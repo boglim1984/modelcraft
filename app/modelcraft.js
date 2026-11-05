@@ -312,6 +312,7 @@ function init(root) {
     if (settingsDlg) {
       settingsDlg.querySelectorAll('input[name="mcKeys"]').forEach((r) => { r.checked = r.value === settings.keys; });
       settingsDlg.querySelectorAll('input[name="mcScroll"]').forEach((r) => { r.checked = r.value === settings.scroll; });
+      settingsDlg.querySelectorAll('input[name="mcTouch1"]').forEach((r) => { r.checked = r.value === settings.touch1; });
       settingsDlg.querySelectorAll('input[name="mcTouch2"]').forEach((r) => { r.checked = r.value === settings.touch2; });
       const sn = settingsDlg.querySelector('input[name="mcSnap"]'), co = settingsDlg.querySelector('input[name="mcCollide"]');
       if (sn) sn.checked = settings.snap;
@@ -343,6 +344,7 @@ function init(root) {
       const t = e.target;
       if (t.name === 'mcKeys') setKeys(t.value);
       else if (t.name === 'mcScroll') setSetting('scroll', t.value);
+      else if (t.name === 'mcTouch1') setSetting('touch1', t.value);
       else if (t.name === 'mcTouch2') setSetting('touch2', t.value);
       else if (t.name === 'mcSnap') setSetting('snap', t.checked);
       else if (t.name === 'mcCollide') setSetting('collide', t.checked);
