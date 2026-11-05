@@ -35,6 +35,7 @@ import {
 } from './model.js';
 import { parseValue, formatLength } from './units.js';
 import { collider } from './collide.js';
+import { hitScale } from './touch-ui.js';   // iPad: pixel tolerances per pointer (finger 1.6×, pen 1.25×, mouse 1×)
 import { t } from "./i18n.js";
 
 /** Tool names in the page's language (getters: the catalog is read when a name is asked for). */
@@ -43,6 +44,8 @@ export const TOOL_NAMES = Object.defineProperties({}, Object.fromEntries(['selec
 export const TOOL_KEYS = { ' ': 'select', l: 'line', r: 'rect', c: 'circle', n: 'polygon', a: 'arc', f: 'offset', b: 'paint', p: 'push', m: 'move', q: 'rotate', s: 'scale', e: 'erase', t: 'tape', d: 'dim', o: 'orbit', h: 'pan', z: 'zoom' };
 
 const DRAG = 6;
+/** A pick radius in px: the finger value under a finger, else the mouse value scaled for the pointer (pen 1.25×, mouse 1×). */
+const px = (mouse, finger) => { const s = hitScale(); return s >= 1.6 ? finger : Math.round(mouse * s); };
 
 export class Tools {
   constructor(host) {
@@ -141,7 +144,7 @@ export class Tools {
     const sc = opts.scene || this.host.scene();
     const r = infer(sc, this.host.cam, ev.x, ev.y, {
       axes: this.axes(), from: opts.from || null, plane: opts.plane || null, skip: opts.skip, snap: this.snapping, ...this.groundOpts(),
-      lockDir: opts.from && this.lock && !opts.free ? this.lock.dir : null, lockKind: this.lock?.kind, ref: this.refEdge, radius: this.touch ? 22 : 12,
+      lockDir: opts.from && this.lock && !opts.free ? this.lock.dir : null, lockKind: this.lock?.kind, ref: this.refEdge, radius: px(12, 22),
     });
     if (r.edge && !opts.from) this.refEdge = { a: r.edge.a, b: r.edge.b };
     return r;
@@ -191,7 +194,7 @@ export class Tools {
   }
   /** What a click picks: a dimension (drawn on top) first, then geometry and guides. */
   pickAt(ev) {
-    return pickDim(this.host.model, this.host.cam, ev.x, ev.y, (m) => formatLength(m, this.host.units), this.touch ? 14 : 6) || pickSection(this.host.model, this.host.cam, ev.x, ev.y, this.touch ? 14 : 6) || pick(this.host.scene(), this.host.cam, ev.x, ev.y, { path: this.host.path, radius: this.touch ? 14 : 7 });
+    return pickDim(this.host.model, this.host.cam, ev.x, ev.y, (m) => formatLength(m, this.host.units), px(6, 14)) || pickSection(this.host.model, this.host.cam, ev.x, ev.y, px(6, 14)) || pick(this.host.scene(), this.host.cam, ev.x, ev.y, { path: this.host.path, radius: px(7, 14) });
   }
   /** What the selection divides (0.7 MC-DIVIDE): one edge → {edge}, the edges of one curve → {curve, edge}, else null. */
   divideTarget() {
@@ -761,7 +764,7 @@ class CurveTool extends ClickTool {
   showGrips(hot = -1, extra = {}) { this.h.overlay({ grips: this.gripsW(), hotGrip: hot, ...extra }); }
   gripAt(ev) {
     const G = this.gripsW(), vp = this.h.cam.viewProj();
-    let best = -1, bd = this.T.touch ? 20 : 10;
+    let best = -1, bd = px(10, 20);
     G.forEach((p, i) => { const s = this.h.cam.project(p, vp); if (s) { const d = Math.hypot(s[0] - ev.x, s[1] - ev.y); if (d < bd) { bd = d; best = i; } } });
     return best;
   }
@@ -1552,7 +1555,7 @@ class ScaleTool extends ClickTool {
   }
   gripAt(ev) {
     const vp = this.h.cam.viewProj();
-    let best = -1, bd = this.T.touch ? 20 : 9;
+    let best = -1, bd = px(9, 20);
     this.grips.forEach((g, i) => { const s2 = this.h.cam.project(this.T.world(g.p), vp); if (s2) { const d = Math.hypot(s2[0] - ev.x, s2[1] - ev.y); if (d < bd) { bd = d; best = i; } } });
     return best;
   }
