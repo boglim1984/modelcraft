@@ -434,3 +434,15 @@ html.cc-compact.cc-land .mc-tl-lanes { max-height: 4rem; }
 .ws-status-slot > .mc-status { display: flex; gap: .75rem; }
 .ws-status-slot .mc-vcb-input { width: 8rem; font-size: .75rem; }
 .ws-palette-scroll > [data-info] { zoom: .85; padding: .5rem .75rem; }
+
+/* ---- The modifier bar (modbar.js; iPad without a keyboard): sticky Shift / Ctrl / Alt, Snap, Ortho ----
+   Floats at the bottom-left of the stage, only on a touch screen (.is-touch, markTouch — the CSS shows it, no JS); 48 px targets for a finger. */
+.mc-modbar { position: absolute; left: .75rem; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); display: none; gap: .25rem; align-items: stretch; padding: .25rem; padding-left: calc(.25rem + env(safe-area-inset-left, 0px)); background: var(--sheet); border: var(--pen-1) solid var(--line); border-radius: var(--radius); z-index: 3; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.mc.is-touch .mc-modbar:not([hidden]) { display: flex; }
+.mc-modbar .mc-tool { min-width: 48px; min-height: 48px; justify-content: center; touch-action: manipulation; }
+.mc-modbar .mc-tool[aria-pressed="true"] { background: var(--action); color: var(--sheet); border-color: var(--action); }
+.mc-modbar .mc-tool.is-locked { box-shadow: inset 0 0 0 2px var(--sheet), 0 0 0 var(--pen-2) var(--ink); }
+.mc-modbar .mc-tool.is-locked::after { content: ''; position: absolute; right: .3rem; top: .3rem; width: .35rem; height: .35rem; border-radius: 50%; background: currentColor; }
+.mc-modbar .mc-tool { position: relative; }
+.mc-modbar-sep { width: var(--pen-1); background: var(--line); margin: .25rem .15rem; }
+@media (max-width: 40rem) { .mc-modbar .mc-tool span { display: none; } }
