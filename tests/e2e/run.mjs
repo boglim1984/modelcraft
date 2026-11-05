@@ -169,8 +169,12 @@ async function main() {
     check('touch marked the UI (.is-touch)', touched);
 
     // ---- a finger taps a toolbar button ----
-    await page.touchscreen.tap(...(await (async () => { const b = await page.locator('[data-tool="line"]').boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; })()));
-    await page.waitForTimeout(150);
+    // the pinch's fingers are up and the touch bar has appeared (markTouch): let the layout settle, then measure and tap
+    await page.waitForTimeout(250);
+    const lineBtn = page.locator('[data-tool="line"]');
+    await lineBtn.scrollIntoViewIfNeeded();
+    await lineBtn.tap();   // touchstart/touchend + the click a finger tap gives a button
+    await page.waitForTimeout(250);
     const tapped = await page.evaluate(() => ({ name: window.modelcraft.tools.name, pressed: document.querySelector('[data-tool="line"]')?.getAttribute('aria-pressed') }));
     check('touchscreen.tap on [data-tool="line"] selects the Line tool', tapped.name === 'line' && tapped.pressed === 'true', JSON.stringify(tapped));
 
