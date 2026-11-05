@@ -60,3 +60,16 @@ The whole app as static files for any web server, as on the Releases page; needs
 
 It has no accounts and no cloud: saving goes to your computer, as in the browser apps. The library panel, "Save for
 offline" and links to the other apps need getcadcraft.com and are hidden or will say they cannot connect.
+
+## iPad end-to-end test
+
+```sh
+npm run e2e              # node tests/e2e/run.mjs  — Chromium emulating an iPad Pro 11, via the preinstalled playwright package
+node tests/e2e/run.mjs --port 8150 --headed
+```
+
+Starts `devshell/serve.mjs --offline` itself, opens `?space=model` as an iPad (834×1194, dpr 2, touch, the iPad Safari user
+agent) and drives trusted pointer input through the DevTools protocol: a pen with pressure draws a rectangle (the model
+must gain geometry), two fingers pinch (the camera must change), a finger taps a toolbar button, and the WebGL context
+is lost and restored. Any console error or page error fails the run; one line per check, exit code 1 on failure.
+Screenshots go to `tests/e2e/out/` (not committed). The libraries must be in `devshell/vendor/` (`npm run fetch-vendor`).
