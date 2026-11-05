@@ -763,7 +763,8 @@ function init(root) {
   // S.8 touch: one finger is the tool — a quick tap is a click, a drag is a press–drag; holding still for half a second
   // finishes what the tool is doing (as Enter), or, with nothing going on, turns that finger into orbit until it lifts.
   // Two fingers pan and pinch-zoom, three orbit (Settings › ModelCraft › Two fingers swaps them: settings.touch2).
-  // While a drawing finger is down, a loupe above it shows what is under it (the snaps a finger hides).
+  // While a drawing finger is down, a loupe above it shows what is under it (the snaps a finger hides). A pencil gets one too
+  // (precision-input, iPad): up-left of the tip, out from under the hand, while a sketch tool is busy or hovers a snap.
   let tap = null;            // the first finger, held back until it moves, lifts or is held
   const LONG_MS = 500, MOVE_PX = 8;
   const loupe = (() => {
@@ -772,18 +773,29 @@ function init(root) {
     c.hidden = true;
     c.setAttribute('aria-hidden', 'true');
     ui.stage.append(c);
-    const R = 64, ZOOM = 2;   // screen px: the loupe's size is set here, its place follows the finger
+    const R = 64, ZOOM_FINGER = 2, ZOOM_PEN = 2.5, PEN_OFF = 90;   // screen px: the loupe's size is set here, its place follows the pointer
     c.style.width = c.style.height = R * 2 + 'px';
-    let at = null, raf = 0;
+    let at = null, raf = 0, pen = false;
+    // the tools that draw: a pencil over a snap of theirs wants to see it (the others: select, orbit, pan, move… no loupe)
+    const SKETCH = new Set(['line', 'rect', 'circle', 'polygon', 'arc', 'arcc', 'curve', 'follow', 'offset', 'push', 'tape', 'protractor', 'dim', 'divide', 'axes', 'section']);
     const paint = () => {
       raf = 0;
       if (!at) return;
       const dpr = window.devicePixelRatio || 1, W = Math.round(R * 2 * dpr);
       if (c.width !== W) { c.width = W; c.height = W; }
-      // above the finger, or below it near the top edge
-      const top = at.y - R * 2 - 36 >= 0 ? at.y - R * 2 - 36 : at.y + 36;
-      c.style.left = Math.max(0, Math.min(ui.stage.clientWidth - R * 2, at.x - R)) + 'px';
-      c.style.top = top + 'px';
+      const ZOOM = pen ? ZOOM_PEN : ZOOM_FINGER;
+      let left, top;
+      if (pen) {
+        // up-left of the pencil's tip (a right hand covers what is down-right of it); mirrored at the stage's edges
+        left = at.x - PEN_OFF - R; if (left < 0) left = at.x + PEN_OFF - R;
+        top = at.y - PEN_OFF - R; if (top < 0) top = at.y + PEN_OFF - R;
+      } else {
+        // above the finger, or below it near the top edge
+        left = at.x - R;
+        top = at.y - R * 2 - 36 >= 0 ? at.y - R * 2 - 36 : at.y + 36;
+      }
+      c.style.left = Math.max(0, Math.min(ui.stage.clientWidth - R * 2, left)) + 'px';
+      c.style.top = Math.max(0, Math.min(ui.stage.clientHeight - R * 2, top)) + 'px';
       const g = c.getContext('2d');
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, W, W);
@@ -797,14 +809,28 @@ function init(root) {
       g.strokeStyle = getComputedStyle(root).getPropertyValue('--action') || '#06c';
       g.lineWidth = dpr;
       g.beginPath(); g.moveTo(W / 2 - 8 * dpr, W / 2); g.lineTo(W / 2 + 8 * dpr, W / 2); g.moveTo(W / 2, W / 2 - 8 * dpr); g.lineTo(W / 2, W / 2 + 8 * dpr); g.stroke();
+      // a ring in the current inference's colour (the overlay's marker: end, mid, center, edge, face, axes…)
+      const kind = host.overlayState?.marker?.kind;
+      if (kind) { g.strokeStyle = view.color(kind); g.lineWidth = 3 * dpr; g.beginPath(); g.arc(W / 2, W / 2, W / 2 - 2 * dpr, 0, Math.PI * 2); g.stroke(); }
       g.restore();
       c.hidden = false;
     };
-    return {
+    const L = {
       // after the view's own frame (tools.move asked for it first), so the loupe copies what was just drawn
-      show(p) { if (tools.name === 'select' || tools.name === 'orbit' || tools.name === 'pan') { this.hide(); return; } at = p; if (!raf) raf = requestAnimationFrame(() => requestAnimationFrame(paint)); },
+      show(p, isPen = false) { if (tools.name === 'select' || tools.name === 'orbit' || tools.name === 'pan') { this.hide(); return; } at = p; pen = isPen; if (!raf) raf = requestAnimationFrame(() => requestAnimationFrame(paint)); },
       hide() { at = null; c.hidden = true; },
     };
+    // the pencil: its own listeners (the main handlers below stay the fingers' and the mouse's); shown while a sketch tool is busy
+    // or the overlay marks a snap under the hovering tip; gone when the tip lifts, leaves or is cancelled
+    const penMove = (e) => {
+      if (e.pointerType !== 'pen') return;
+      if (!SKETCH.has(tools.name) || (!tools.tool.busy && !host.overlayState?.marker) || (e.buttons & ~1) !== 0) { if (pen) L.hide(); return; }
+      L.show(pos(e), true);
+    };
+    const penEnd = (e) => { if (e.pointerType === 'pen' && pen) L.hide(); };
+    ui.over.addEventListener('pointermove', penMove);
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) ui.over.addEventListener(ev, penEnd);
+    return L;
   })();
   const markTouch = () => {
     if (tools.touch) return;
@@ -828,6 +854,8 @@ function init(root) {
         if (document.activeElement === ui.vcb) { ui.vcb.blur(); ui.vcb.focus(); }   // the keyboard changes on the next focus
       });
     }
+    // precision-input (iPad): the "123" affordance, the floating "Enter a length" button and the unit chips (dim-field.js)
+    import('./dim-field.js').then((m) => m.createDimField(ui, { tools, focusView, root, t, el })).catch((err) => console.warn('dim-field', err));
   };
   if (matchMedia?.('(pointer: coarse)').matches) markTouch();   // i18n-ignore: a media query
   const longPress = () => {
