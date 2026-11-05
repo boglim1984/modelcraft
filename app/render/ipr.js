@@ -117,6 +117,7 @@ export function createIpr(o) {
     drag = [x, y];
     canvas.setPointerCapture(ev.pointerId);
   });
+  canvas.addEventListener('pointercancel', () => { drag = null; });   // a lost pointer (pointercancel, a capture taken away, an app switch) ends the drag
   canvas.addEventListener('pointerup', (ev) => {
     if (!drag || mode !== 'region') return;
     const [x, y] = pix(ev), r = [Math.floor(Math.min(drag[0], x)), Math.floor(Math.min(drag[1], y)), Math.ceil(Math.max(drag[0], x)), Math.ceil(Math.max(drag[1], y))];

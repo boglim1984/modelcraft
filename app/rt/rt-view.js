@@ -274,6 +274,7 @@ export async function openLiveView(adapter, { t, parent = document.body, pool = 
     dirty = true;
   });
   canvas.addEventListener('pointerup', (e) => { paint('up', e); drag = null; });
+  canvas.addEventListener('pointercancel', (e) => { paint('up', e); drag = null; });   // a lost pointer (pointercancel, a capture taken away, an app switch) ends the drag
 
   // ---- sun, quality, follow ----
   const sunInput = () => { showSun(); if (rt) { rt.setSun(adapter.sun(sunNow())); dirty = true; } };
@@ -297,6 +298,8 @@ export async function openLiveView(adapter, { t, parent = document.body, pool = 
       el.style.right = 'auto'; el.style.bottom = 'auto';
     });
     bar.addEventListener('pointerup', () => { mv = null; });
+    for (const n of ['pointercancel', 'lostpointercapture']) bar.addEventListener(n, () => { mv = null; });
+    bar.style.touchAction = 'none';
     popBtn.addEventListener('click', async () => { close(); await openLiveView(adapter, { t, parent, pool, window: true }); });
   }
   closeBtn.addEventListener('click', () => close());
